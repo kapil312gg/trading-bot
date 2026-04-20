@@ -3,6 +3,22 @@
 <head>
   <script>
 window.__DELTA_BACKEND_AUTO__ = "https://knsfmtobwpap.eu-central-1.clawcloudrun.com";
+
+// force connect
+window.addEventListener("load", () => {
+  setTimeout(() => {
+    try {
+      if (window.backendBotSync) {
+        window.backendBotSync();
+      }
+    } catch (e) {
+      console.log("Auto connect error:", e);
+    }
+  }, 2000);
+});
+</script>
+  <script>
+window.__DELTA_BACKEND_AUTO__ = "https://knsfmtobwpap.eu-central-1.clawcloudrun.com";
 </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
