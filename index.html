@@ -1,25 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script>
-window.__DELTA_BACKEND_AUTO__ = "https://knsfmtobwpap.eu-central-1.clawcloudrun.com";
-
-// force connect
-window.addEventListener("load", () => {
-  setTimeout(() => {
-    try {
-      if (window.backendBotSync) {
-        window.backendBotSync();
-      }
-    } catch (e) {
-      console.log("Auto connect error:", e);
-    }
-  }, 2000);
-});
-</script>
-  <script>
-window.__DELTA_BACKEND_AUTO__ = "https://knsfmtobwpap.eu-central-1.clawcloudrun.com";
-</script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>AI Trading Bot Pro</title>
@@ -124,17 +105,23 @@ window.__DELTA_BACKEND_AUTO__ = "https://knsfmtobwpap.eu-central-1.clawcloudrun.
     .strategy-badge{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; font-size:10px; font-weight:800;}
     .desktop-grid-2{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;}
   </style>
-  <!-- AUTO BACKEND PATCH for HF Spaces -->
   <script>
-  (function(){
-    var loc=window.location;
-    if(loc.hostname==='localhost'||loc.hostname==='127.0.0.1'||loc.hostname==='0.0.0.0'){
-      window.__DELTA_BACKEND_AUTO__=loc.protocol+'//'+loc.hostname+':7860';
-    }else{
-      window.__DELTA_BACKEND_AUTO__=loc.protocol+'//'+loc.host;
-    }
-  })();
-  </script>
+const BACKEND = "https://knsfmtobwpap.eu-central-1.clawcloudrun.com";
+
+// backend fix
+window.__DELTA_BACKEND_AUTO__ = BACKEND;
+
+// सभी API calls backend पे भेजो
+const oldFetch = window.fetch;
+window.fetch = function(url, options) {
+  if (typeof url === "string" && url.startsWith("/")) {
+    url = BACKEND + url;
+  }
+  return oldFetch(url, options);
+};
+
+console.log("✅ Backend Connected:", BACKEND);
+</script>
 </head>
 <body>
   <!-- Splash -->
