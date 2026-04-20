@@ -723,28 +723,57 @@ function toast(msg, type='info'){
  *********************/
 const PERF = { lastLoopMs: 0, lastWorkerMs: 0, lastWsMsgAt: 0, reconnects: 0 };
 let wakeLockObj = null;
+let wakeLockDesired = false;
+
+async function acquireWakeLock(){
+  if(!wakeLockDesired) return;
+  if(!('wakeLock' in navigator)) return;
+  try{
+    if(wakeLockObj) return;
+    wakeLockObj = await navigator.wakeLock.request('screen');
+    const b=document.getElementById('wakeBtn');
+    if(b){ b.textContent='Wake Lock: ON'; b.style.background='linear-gradient(135deg,var(--g),#16a34a)'; }
+    wakeLockObj.addEventListener('release', ()=>{
+      wakeLockObj=null;
+      const bb=document.getElementById('wakeBtn');
+      if(bb){ bb.textContent='Wake Lock: OFF'; bb.style.background='rgba(107,114,128,.25)'; }
+      // Auto re-acquire when screen comes back
+      if(wakeLockDesired) setTimeout(acquireWakeLock, 500);
+    });
+  }catch(e){}
+}
+
 async function toggleWakeLock(){
   try{
-    if(wakeLockObj){
-      await wakeLockObj.release();
-      wakeLockObj = null;
+    if(wakeLockDesired){
+      wakeLockDesired = false;
+      if(wakeLockObj){ await wakeLockObj.release(); wakeLockObj=null; }
       const b=document.getElementById('wakeBtn');
       if(b){ b.textContent='Wake Lock: OFF'; b.style.background='rgba(107,114,128,.25)'; }
       toast('Wake Lock OFF','info');
       return;
     }
     if(!('wakeLock' in navigator)) return toast('Wake Lock not supported','error');
-    wakeLockObj = await navigator.wakeLock.request('screen');
-    const b=document.getElementById('wakeBtn');
-    if(b){ b.textContent='Wake Lock: ON'; b.style.background='linear-gradient(135deg,var(--g),#16a34a)'; }
+    wakeLockDesired = true;
+    await acquireWakeLock();
     toast('Wake Lock ON','success');
-    wakeLockObj.addEventListener('release', ()=>{
-      wakeLockObj=null;
-      const bb=document.getElementById('wakeBtn');
-      if(bb){ bb.textContent='Wake Lock: OFF'; bb.style.background='rgba(107,114,128,.25)'; }
-    });
   }catch(e){ toast('Wake Lock failed','error'); }
 }
+
+// Jab bhi user app wapas khole (screen on / tab switch)
+document.addEventListener('visibilitychange', async ()=>{
+  if(document.visibilityState !== 'visible') return;
+  // 1) Wake lock re-acquire
+  if(wakeLockDesired && !wakeLockObj) await acquireWakeLock();
+  // 2) Candle feed restart
+  if(store.current && !_candleFeedBusy) connectCandleWS();
+  // 3) Delta reconnect agar drop hua ho
+  if(DELTA._wasConnected && !DELTA.connected){
+    await deltaAutoReconnect();
+  } else if(DELTA.connected){
+    try{ await deltaRefreshAccount({ silent:true }); }catch(e){}
+  }
+});
 
 function exportBackup(){
   try{
