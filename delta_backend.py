@@ -16,12 +16,13 @@ import os
 import secrets
 import socket
 import time
+import xml.etree.ElementTree as ET
 from collections import deque
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, quote_plus, urlencode, urlparse
 from urllib.request import Request, urlopen
 
 
@@ -35,6 +36,7 @@ CANDLE_CACHE: dict[str, dict[str, Any]] = {}
 PROFILE_CACHE: dict[str, dict[str, Any]] = {}
 TRADE_COOLDOWNS: dict[str, float] = {}
 SESSIONS: dict[str, dict[str, Any]] = {}
+NEWS_CACHE: dict[str, dict[str, Any]] = {}
 DELTA_APP_SYMBOL_TO_MARKET: dict[str, str] = {
     "BTCUSDT": "BTCUSD",
     "ETHUSDT": "ETHUSD",
@@ -69,16 +71,59 @@ SESSION_TTL_SEC = 12 * 60 * 60
 APP_LOGIN_ID = str(os.getenv("APP_USER_ID") or "").strip()
 APP_LOGIN_PASS = str(os.getenv("APP_USER_PASS") or "").strip()
 AUTH_REQUIRED = bool(APP_LOGIN_ID and APP_LOGIN_PASS)
+BACKEND_STORE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backend_store.json")
 
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def utc_day_key() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
 def add_log(event: str, **meta: Any) -> None:
     row = {"ts": utc_now(), "event": event, **meta}
     LOGS.append(row)
     print(json.dumps(row, ensure_ascii=False))
+
+
+def load_backend_store() -> dict[str, Any]:
+    try:
+        with open(BACKEND_STORE_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, dict):
+                return data
+    except Exception:
+        pass
+    return {}
+
+
+def save_backend_store(data: dict[str, Any]) -> None:
+    try:
+        with open(BACKEND_STORE_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        add_log("backend_store_save_failed", error=str(e))
+
+
+BACKEND_STORE: dict[str, Any] = load_backend_store()
+BACKEND_STORE.setdefault("creds", {"live": {"key": "", "secret": ""}, "demo": {"key": "", "secret": ""}})
+
+
+def get_saved_creds(mode: str) -> tuple[str, str]:
+    m = normalize_mode(mode)
+    creds = (BACKEND_STORE.get("creds") or {}).get(m) or {}
+    key = str(creds.get("key") or "").strip()
+    secret = str(creds.get("secret") or "").strip()
+    return key, secret
+
+
+def save_creds(mode: str, key: str, secret: str) -> None:
+    m = normalize_mode(mode)
+    creds = BACKEND_STORE.setdefault("creds", {"live": {"key": "", "secret": ""}, "demo": {"key": "", "secret": ""}})
+    creds[m] = {"key": str(key or "").strip(), "secret": str(secret or "").strip()}
+    save_backend_store(BACKEND_STORE)
 
 
 def normalize_mode(mode: str | None) -> str:
@@ -438,6 +483,81 @@ def local_ips() -> list[str]:
     return sorted(out)
 
 
+NEWS_SYMBOL_HINTS: dict[str, str] = {
+    "BTCUSDT": "bitcoin",
+    "ETHUSDT": "ethereum",
+    "SOLUSDT": "solana",
+    "PAXGUSDT": "gold",
+}
+
+
+def sentiment_from_title(title: str) -> int:
+    txt = (title or "").lower()
+    pos = ("surge", "jump", "breakout", "bull", "approval", "rally", "strong", "record", "gain")
+    neg = ("crash", "drop", "bear", "lawsuit", "hack", "ban", "liquidation", "fear", "weak")
+    score = 0
+    for w in pos:
+        if w in txt:
+            score += 2
+    for w in neg:
+        if w in txt:
+            score -= 2
+    return score
+
+
+def fetch_news_sentiment(symbol: str) -> dict[str, Any]:
+    sym = str(symbol or "").strip().upper()
+    key = NEWS_SYMBOL_HINTS.get(sym, sym.replace("USDT", "").lower() or "crypto")
+    cache_key = f"news:{key}"
+    cached = cache_get(NEWS_CACHE, cache_key, 300.0)
+    if cached is not None:
+        return cached
+
+    query = quote_plus(f"{key} crypto when:1d")
+    url = f"https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
+    titles: list[str] = []
+    try:
+        status, _, _, raw = request_json("GET", url, headers={"User-Agent": USER_AGENT}, payload_text=None, timeout=12)
+        if status >= 400:
+            raise RuntimeError(short_text(raw, 160))
+        root = ET.fromstring(raw)
+        for node in root.findall(".//item/title"):
+            t = str(node.text or "").strip()
+            if t:
+                titles.append(t)
+            if len(titles) >= 15:
+                break
+    except Exception:
+        out = {
+            "ok": False,
+            "symbol": sym,
+            "bias": "neutral",
+            "score": 0,
+            "top_headline": "",
+            "count": 0,
+            "ts": utc_now(),
+        }
+        return cache_put(NEWS_CACHE, cache_key, out)
+
+    score = sum(sentiment_from_title(t) for t in titles)
+    if score >= 6:
+        bias = "bullish"
+    elif score <= -6:
+        bias = "bearish"
+    else:
+        bias = "neutral"
+    out = {
+        "ok": True,
+        "symbol": sym,
+        "bias": bias,
+        "score": score,
+        "top_headline": titles[0] if titles else "",
+        "count": len(titles),
+        "ts": utc_now(),
+    }
+    return cache_put(NEWS_CACHE, cache_key, out)
+
+
 def product_candidates(products: list[dict[str, Any]], target: str) -> list[tuple[int, Any]]:
     base = target.replace("USDT", "")
     picks: list[tuple[int, Any]] = []
@@ -590,7 +710,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         self.end_headers()
         self.wfile.write(raw)
 
@@ -655,7 +775,7 @@ class Handler(BaseHTTPRequestHandler):
         path = parsed.path
         q = parse_qs(parsed.query)
 
-        # ── Serve index.html at root ──────────────────────────────────────────
+        # â”€â”€ Serve index.html at root â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if path in ("/", "/index.html", ""):
             self._serve_html(INDEX_HTML_PATH)
             return
@@ -686,6 +806,28 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/delta/history":
             self._json(200, {"ok": True, "count": len(TRADE_HISTORY), "history": list(TRADE_HISTORY)})
+            return
+
+        if path == "/news/sentiment":
+            symbol = str((q.get("symbol") or ["BTCUSDT"])[0]).strip().upper() or "BTCUSDT"
+            out = fetch_news_sentiment(symbol)
+            self._json(200, out)
+            return
+
+        if path == "/delta/creds":
+            session = self._require_auth()
+            if session is None:
+                return
+            mode = normalize_mode((q.get("mode") or ["live"])[0])
+            key, secret = get_saved_creds(mode)
+            self._json(200, {
+                "ok": True,
+                "mode": mode,
+                "has_key": bool(key),
+                "has_secret": bool(secret),
+                "key": key,
+                "secret": secret,
+            })
             return
 
         if path == "/ip":
@@ -902,6 +1044,20 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, {"ok": True})
             return
 
+        if path == "/delta/creds/save":
+            session = self._require_auth()
+            if session is None:
+                return
+            mode = normalize_mode(str(body.get("mode") or "live"))
+            key = str(body.get("key") or "").strip()
+            secret = str(body.get("secret") or "").strip()
+            if not key or not secret:
+                self._json(400, {"ok": False, "error": "Missing key/secret"})
+                return
+            save_creds(mode, key, secret)
+            self._json(200, {"ok": True, "mode": mode, "saved": True})
+            return
+
         if path in ("/delta/test", "/delta/account", "/delta/positions", "/delta/order", "/delta/close", "/delta/orders_all"):
             session = self._require_auth()
             if session is None:
@@ -910,8 +1066,14 @@ class Handler(BaseHTTPRequestHandler):
             secret = str(body.get("secret") or "").strip()
             mode = normalize_mode(str(body.get("mode") or "live"))
             if not key or not secret:
+                saved_key, saved_secret = get_saved_creds(mode)
+                key = key or saved_key
+                secret = secret or saved_secret
+            if not key or not secret:
                 self._json(400, {"ok": False, "error": "Missing key/secret"})
                 return
+            if str(body.get("key") or "").strip() and str(body.get("secret") or "").strip():
+                save_creds(mode, key, secret)
 
             if path == "/delta/test":
                 status, payload, raw = signed_delta_call(
@@ -1093,7 +1255,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 ################################################################################
-# BACKGROUND BOT ENGINE — Full Pro MTF + NN logic (mirrors JS app exactly)
+# BACKGROUND BOT ENGINE â€” Full Pro MTF + NN logic (mirrors JS app exactly)
 # Runs 24/7 even when browser is closed.
 ################################################################################
 
@@ -1122,7 +1284,7 @@ TF_SEC = {"15m": 900, "30m": 1800}
 TF_LIST = ["15m", "30m"]
 
 
-# ── Candle helpers ─────────────────────────────────────────────────────────────
+# â”€â”€ Candle helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def bot_fetch_candles(mode: str, symbol: str, tf: str = "15m", limit: int = 120) -> list[dict]:
     market_sym = SYMBOL_TO_MARKET.get(symbol, symbol.replace("USDT", "USD"))
@@ -1142,7 +1304,7 @@ def bot_fetch_candles(mode: str, symbol: str, tf: str = "15m", limit: int = 120)
         return []
 
 
-# ── Indicator library (mirrors JS worker) ─────────────────────────────────────
+# â”€â”€ Indicator library (mirrors JS worker) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _sma(arr: list[float], n: int) -> float | None:
     if len(arr) < n:
@@ -1235,7 +1397,7 @@ def _adx(candles: list[dict], period: int = 14):
     return {"adx": adx_v, "diPlus": di_p, "diMinus": di_m}
 
 
-# ── Signal computation (mirrors JS computeSignals) ────────────────────────────
+# â”€â”€ Signal computation (mirrors JS computeSignals) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def compute_signals(candles: list[dict]) -> dict:
     closes = [float(c.get("close", 0)) for c in candles]
@@ -1306,7 +1468,7 @@ def compute_signals(candles: list[dict]) -> dict:
     }
 
 
-# ── NN predict (mirrors JS nnPredict) ─────────────────────────────────────────
+# â”€â”€ NN predict (mirrors JS nnPredict) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def nn_predict(candles: list[dict]) -> dict:
     if len(candles) < 30:
@@ -1381,7 +1543,7 @@ def nn_predict(candles: list[dict]) -> dict:
     return {"dir": direction, "conf": conf, "pat": pat}
 
 
-# ── Regime + filters (mirrors JS) ─────────────────────────────────────────────
+# â”€â”€ Regime + filters (mirrors JS) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def determine_regime(sig30: dict, strict: bool = False) -> dict:
     adx = sig30.get("adx", 0)
@@ -1453,7 +1615,7 @@ def execution_signal(candles15: list[dict], want_side: str) -> dict:
     return {"ok": True}
 
 
-# ── SL/TP (mirrors JS slTpAdvanced) ───────────────────────────────────────────
+# â”€â”€ SL/TP (mirrors JS slTpAdvanced) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def rr_by_tf(tf: str, adx: float) -> float:
     rr = 3.2 if tf == "15m" else 4.6
@@ -1494,7 +1656,7 @@ def bot_sl_tp(symbol: str, side: str, entry: float,
     return sl, tp
 
 
-# ── Live price / position helpers ─────────────────────────────────────────────
+# â”€â”€ Live price / position helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def bot_get_price(mode: str, symbol: str) -> float | None:
     market_sym = SYMBOL_TO_MARKET.get(symbol, symbol.replace("USDT", "USD"))
@@ -1571,7 +1733,7 @@ def bot_place_order(key: str, secret: str, mode: str, product_id: Any,
         return False
 
 
-# ── Per-candle close tracking ──────────────────────────────────────────────────
+# â”€â”€ Per-candle close tracking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def get_last_closed_candle(candles: list[dict], tf: str) -> int:
     """Return the timestamp of the last *closed* candle (not the live one)."""
@@ -1589,7 +1751,113 @@ def get_last_closed_candle(candles: list[dict], tf: str) -> int:
     return 0
 
 
-# ── Core bot logic per symbol ─────────────────────────────────────────────────
+def bot_daily_counter(state: dict[str, Any]) -> dict[str, Any]:
+    c = state.setdefault("daily_trade_counter", {"day": "", "count": 0})
+    day = utc_day_key()
+    if str(c.get("day") or "") != day:
+        c["day"] = day
+        c["count"] = 0
+    try:
+        c["count"] = max(0, int(c.get("count", 0)))
+    except Exception:
+        c["count"] = 0
+    return c
+
+
+def bot_can_open_today(state: dict[str, Any]) -> bool:
+    c = bot_daily_counter(state)
+    try:
+        limit = max(1, min(10, int(state.get("daily_trade_limit", 10))))
+    except Exception:
+        limit = 10
+    return int(c.get("count", 0)) < limit
+
+
+def bot_mark_open_today(state: dict[str, Any]) -> None:
+    c = bot_daily_counter(state)
+    c["count"] = int(c.get("count", 0)) + 1
+
+
+def bot_price_action_signal(candles_15: list[dict], sig15: dict, regime: dict) -> dict[str, Any]:
+    if len(candles_15) < 24:
+        return {"ok": False, "why": "warmup"}
+    last = candles_15[-1]
+    prev = candles_15[-2]
+    highs = [to_float(c.get("high"), 0.0) for c in candles_15[-13:-1]]
+    lows = [to_float(c.get("low"), 0.0) for c in candles_15[-13:-1]]
+    if not highs or not lows:
+        return {"ok": False, "why": "range"}
+    swing_high = max(highs)
+    swing_low = min(lows)
+    vols = [to_float(c.get("volume"), 0.0) for c in candles_15[-20:]]
+    avg_vol = sum(vols) / max(1, len(vols))
+    vol_boost = to_float(last.get("volume"), 0.0) / max(1e-9, avg_vol)
+    rng = max(1e-9, to_float(last.get("high"), 0.0) - to_float(last.get("low"), 0.0))
+    body = abs(to_float(last.get("close"), 0.0) - to_float(last.get("open"), 0.0))
+    body_power = body / rng
+    adx = to_float(sig15.get("adx"), 0.0)
+    if adx < 16 or vol_boost < 1.1 or body_power < 0.55:
+        return {"ok": False, "why": "weak"}
+    up_break = to_float(last.get("close"), 0.0) > swing_high and to_float(last.get("close"), 0.0) > to_float(prev.get("high"), 0.0)
+    dn_break = to_float(last.get("close"), 0.0) < swing_low and to_float(last.get("close"), 0.0) < to_float(prev.get("low"), 0.0)
+    side = "LONG" if up_break else ("SHORT" if dn_break else None)
+    if side is None:
+        return {"ok": False, "why": "no_breakout"}
+    if regime.get("ok") and not regime.get("soft") and regime.get("side") and regime.get("side") != side:
+        return {"ok": False, "why": "regime_mismatch"}
+    quality = round(max(50, min(99, 58 + adx + (vol_boost * 10) + (body_power * 12))))
+    return {"ok": True, "side": side, "quality": quality}
+
+
+def bot_combined_signal(sig15: dict, sig30: dict, regime: dict, pa: dict, news: dict) -> dict[str, Any]:
+    news_bias = str(news.get("bias") or "neutral").lower()
+    news_score = abs(to_float(news.get("score"), 0.0))
+    news_side = "LONG" if news_bias == "bullish" else ("SHORT" if news_bias == "bearish" else None)
+    regime_side = None if regime.get("soft") else regime.get("side")
+
+    side: str | None = None
+    quality = 0.0
+    reason = ""
+
+    if pa.get("ok"):
+        side = str(pa.get("side"))
+        quality = float(pa.get("quality", 0))
+        reason = "PA breakout"
+        if news_side == side and news_score >= 6:
+            quality += min(18.0, news_score)
+            reason += " + news aligned"
+
+    if news_side and news_score >= 18 and (not regime_side or regime_side == news_side):
+        news_quality = min(99.0, 76.0 + news_score)
+        if side is None or news_quality > quality:
+            side = news_side
+            quality = news_quality
+            reason = f"strong {news_bias} news"
+
+    if side is None:
+        return {"ok": False, "why": "no_combined_signal"}
+    if regime_side and regime_side != side:
+        return {"ok": False, "why": "30m_trend_mismatch"}
+
+    buy = to_float(sig15.get("buy"), 0.0)
+    sell = to_float(sig15.get("sell"), 0.0)
+    diff = abs(buy - sell)
+    trend_ok = buy >= sell if side == "LONG" else sell >= buy
+    if not trend_ok and news_score < 24:
+        return {"ok": False, "why": "15m_score_mismatch"}
+    quality += min(10.0, diff / 4.0)
+
+    quality_i = round(min(99.0, quality))
+    return {
+        "ok": quality_i >= 75,
+        "side": side,
+        "quality": quality_i,
+        "strategy": f"Combined PA + News ({reason})",
+        "why": reason,
+    }
+
+
+# â”€â”€ Core bot logic per symbol â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def bot_run_symbol(state: dict, symbol: str) -> None:
     key: str = state["key"]
@@ -1602,6 +1870,10 @@ def bot_run_symbol(state: dict, symbol: str) -> None:
     bot_enabled: bool = bool(state.get("bot_enabled", False))
     live_trading: bool = bool(state.get("live_trading", False))
     strict: bool = bool(state.get("strict_mode", False))
+    strategy_nn: bool = bool(state.get("strategy_nn", False))
+    strategy_pa: bool = bool(state.get("strategy_pa", True))
+    strategy_news: bool = bool(state.get("strategy_news", True))
+    min_entry_gap_sec: int = max(60, int(state.get("min_entry_gap_sec", 1800)))
 
     pid_raw = product_map.get(symbol, "")
     if not pid_raw:
@@ -1618,7 +1890,6 @@ def bot_run_symbol(state: dict, symbol: str) -> None:
     contract_qty = DELTA_CONTRACT_VALUE.get(symbol, 0.01)
     qty = lot * contract_qty
 
-    # ── 1) Monitor open trade: SL/TP/NN-flip ────────────────────────────────
     if active:
         is_long = active.get("side") == "LONG"
         sl = float(active.get("sl", 0))
@@ -1627,28 +1898,15 @@ def bot_run_symbol(state: dict, symbol: str) -> None:
 
         if sl > 0 and tp > 0:
             if is_long:
-                if price <= sl: reason = "SL Hit"
-                elif price >= tp: reason = "TP Hit"
+                if price <= sl:
+                    reason = "SL Hit"
+                elif price >= tp:
+                    reason = "TP Hit"
             else:
-                if price >= sl: reason = "SL Hit"
-                elif price <= tp: reason = "TP Hit"
-
-        # NN flip check (only on new 15m candle close)
-        if reason is None and bot_enabled:
-            candles_15 = bot_fetch_candles(mode, symbol, "15m", 60)
-            last_closed = get_last_closed_candle(candles_15, "15m")
-            prev_flip_eval = int(state.get(f"last_flip_eval_{symbol}", 0))
-            entry_pnl = (price - float(active.get("entry", price))) * qty
-            if not is_long:
-                entry_pnl = -entry_pnl
-            if last_closed and last_closed != prev_flip_eval and entry_pnl < 0:
-                nn = nn_predict(candles_15)
-                conf = nn.get("conf", 0)
-                direction = nn.get("dir", "UP")
-                want = ("SHORT" if direction == "DOWN" else "LONG") if conf > 60 else ("LONG" if direction == "DOWN" else "SHORT")
-                if active.get("side") != want:
-                    reason = f"NN Flip (15m): {direction} {conf}%"
-                state[f"last_flip_eval_{symbol}"] = last_closed
+                if price >= sl:
+                    reason = "SL Hit"
+                elif price <= tp:
+                    reason = "TP Hit"
 
         if reason:
             entry_p = float(active.get("entry", price))
@@ -1670,83 +1928,56 @@ def bot_run_symbol(state: dict, symbol: str) -> None:
             current_balance = float(state.get("demo_balance", 1000.0))
             state["demo_balance"] = max(0.0, current_balance + net_pnl)
 
-            record_trade_event(reason, mode, product_id,
-                               side=active.get("side"), symbol=symbol,
-                               pnl_usd=round(net_pnl, 4))
+            record_trade_event(reason, mode, product_id, side=active.get("side"), symbol=symbol, pnl_usd=round(net_pnl, 4))
             add_log("bot_close", symbol=symbol, reason=reason, price=price, pnl=round(net_pnl, 4))
             state["last_close_time"] = time.time()
             trades[:] = [t for t in trades if not t.get("closed")]
             return
 
-    # ── 2) Cooldown ──────────────────────────────────────────────────────────
     last_close = float(state.get("last_close_time", 0))
     if time.time() - last_close < TRADE_COOLDOWN_SEC:
         return
 
     if not bot_enabled or active:
         return
+    if not bot_can_open_today(state):
+        return
+    last_entry_time = float(state.get(f"last_entry_time_{symbol}", 0.0))
+    if (time.time() - last_entry_time) < min_entry_gap_sec:
+        return
 
-    # ── 3) Fetch candles + compute signals ───────────────────────────────────
     candles_15 = bot_fetch_candles(mode, symbol, "15m", 120)
     candles_30 = bot_fetch_candles(mode, symbol, "30m", 120)
     if len(candles_15) < 60 or len(candles_30) < 60:
         return
 
-    # Only enter after a new 15m candle closes
     last_closed_15 = get_last_closed_candle(candles_15, "15m")
     last_entry_candle = int(state.get(f"last_entry_candle_{symbol}", 0))
     if last_closed_15 == 0 or last_closed_15 == last_entry_candle:
-        return  # same candle — wait for next close
+        return
 
     sig15 = compute_signals(candles_15)
     sig30 = compute_signals(candles_30)
-    nn15  = nn_predict(candles_15)
-
-    # ── 4) Pro MTF logic ─────────────────────────────────────────────────────
     regime = determine_regime(sig30, strict)
-    filters = no_trade_filters(candles_15, sig15, strict)
-    setup   = setup_signal(nn15, strict)
-
-    side = None
-    strategy = ""
-
-    if regime["ok"] and filters["ok"] and setup["ok"]:
-        want = setup["dir"]
-        trig = trigger_signal(sig15, want, strict)
-        exc  = execution_signal(candles_15, want)
-        regime_ok = regime["soft"] or (regime["side"] == want)
-        conf_ok   = not regime["soft"] or nn15.get("conf", 0) >= 60
-        if trig["ok"] and exc["ok"] and regime_ok and conf_ok:
-            side = want
-            strategy = "AI Neural (Pro)"
-            add_log("bot_signal", symbol=symbol, side=side,
-                    regime=regime["regime"], nn_dir=nn15.get("dir"),
-                    nn_conf=nn15.get("conf"), adx=round(sig30.get("adx",0),1))
-
-    # ── 5) Fallback: Your NN ─────────────────────────────────────────────────
-    if side is None:
-        conf = nn15.get("conf", 0)
-        nn_dir = nn15.get("dir", "UP")
-        side = ("SHORT" if nn_dir == "DOWN" else "LONG") if conf > 60 else None
-        if side:
-            exc = execution_signal(candles_15, side)
-            if not exc["ok"]:
-                side = None
-            else:
-                strategy = "AI Neural (User)"
-
-    if side is None:
+    pa = bot_price_action_signal(candles_15, sig15, regime)
+    news = fetch_news_sentiment(symbol) if strategy_news else {"bias": "neutral", "score": 0}
+    combined = bot_combined_signal(sig15, sig30, regime, pa if strategy_pa else {}, news)
+    if not combined.get("ok"):
+        return
+    side = str(combined.get("side"))
+    strategy = str(combined.get("strategy") or "Combined PA + News")
+    if str(combined.get("why") or "").startswith("strong"):
+        exc = {"ok": True}
+    else:
+        exc = execution_signal(candles_15, side)
+    if not exc.get("ok"):
         return
 
-    # Verify no open position on exchange (prevents double-entry)
     if live_trading and bot_check_position_open(key, secret, mode, symbol):
         return
 
     entry = price
-    sl, tp = bot_sl_tp(
-        symbol, side, entry, sl_points, tp_points,
-        tf="15m", atr=sig15.get("atr", 0), adx=sig15.get("adx", 0)
-    )
+    sl, tp = bot_sl_tp(symbol, side, entry, sl_points, tp_points, tf="15m", atr=sig15.get("atr", 0), adx=sig15.get("adx", 0))
 
     if live_trading:
         exc_side = "buy" if side == "LONG" else "sell"
@@ -1757,23 +1988,28 @@ def bot_run_symbol(state: dict, symbol: str) -> None:
 
     new_trade = {
         "id": int(time.time() * 1000),
-        "symbol": symbol, "side": side,
-        "entry": entry, "sl": sl, "tp": tp,
-        "lot": lot, "qty": qty,
+        "symbol": symbol,
+        "side": side,
+        "entry": entry,
+        "sl": sl,
+        "tp": tp,
+        "lot": lot,
+        "qty": qty,
         "entry_time": utc_now(),
         "closed": False,
         "strategy": strategy,
         "tf": "15m",
     }
     trades.append(new_trade)
+    bot_mark_open_today(state)
     state["last_trade_time"] = time.time()
+    state[f"last_entry_time_{symbol}"] = time.time()
     state[f"last_entry_candle_{symbol}"] = last_closed_15
-    add_log("bot_open", symbol=symbol, side=side, entry=entry,
-            sl=sl, tp=tp, strategy=strategy)
+    add_log("bot_open", symbol=symbol, side=side, entry=entry, sl=sl, tp=tp, strategy=strategy)
 
 
 def bot_loop() -> None:
-    """Main background bot loop — runs every 10 seconds."""
+    """Main background bot loop â€” runs every 10 seconds."""
     add_log("bot_engine_started")
     while True:
         try:
@@ -1816,6 +2052,8 @@ def _patched_do_GET(self: Handler) -> None:
                     "symbols": state.get("symbols", SYMBOLS),
                     "demo_balance": state.get("demo_balance", 1000.0),
                     "trades": [t for t in state.get("trades", []) if not t.get("closed")],
+                    "daily_trade_counter": bot_daily_counter(state),
+                    "daily_trade_limit": max(1, min(10, int(state.get("daily_trade_limit", 10)))),
                     "last_heartbeat": state.get("last_heartbeat", 0),
                 })
         self._json(200, {"ok": True, "bots": actors, "ts": utc_now()})
@@ -1837,11 +2075,15 @@ def _patched_do_POST(self: Handler) -> None:
 
         key = str(body.get("key") or "").strip()
         secret = str(body.get("secret") or "").strip()
+        mode = normalize_mode(str(body.get("mode") or "live"))
+        if not key or not secret:
+            saved_key, saved_secret = get_saved_creds(mode)
+            key = key or saved_key
+            secret = secret or saved_secret
         if not key or not secret:
             self._json(400, {"ok": False, "error": "Missing key/secret"})
             return
-
-        mode = normalize_mode(str(body.get("mode") or "live"))
+        save_creds(mode, key, secret)
         ak = actor_key(mode, key)
 
         with BOT_STATE_LOCK:
@@ -1862,6 +2104,12 @@ def _patched_do_POST(self: Handler) -> None:
                 "lot": max(1, int(body.get("lot", 1))),
                 "sl_points": float(body.get("sl_points", 0)),
                 "tp_points": float(body.get("tp_points", 0)),
+                "strategy_nn": bool(body["strategy_nn"]) if "strategy_nn" in body else existing.get("strategy_nn", False),
+                "strategy_pa": bool(body["strategy_pa"]) if "strategy_pa" in body else existing.get("strategy_pa", True),
+                "strategy_news": bool(body["strategy_news"]) if "strategy_news" in body else existing.get("strategy_news", True),
+                "daily_trade_limit": max(1, min(10, int(body.get("daily_trade_limit", existing.get("daily_trade_limit", 10))))),
+                "min_entry_gap_sec": max(60, int(body.get("min_entry_gap_sec", existing.get("min_entry_gap_sec", 1800)))),
+                "daily_trade_counter": existing.get("daily_trade_counter", {"day": "", "count": 0}),
                 "symbols": list(body.get("symbols") or SYMBOLS),
                 "demo_balance": float(body.get("demo_balance") or
                                       existing.get("demo_balance", 1000.0)),
@@ -1891,6 +2139,13 @@ def _patched_do_POST(self: Handler) -> None:
         key = str(body.get("key") or "").strip()
         secret = str(body.get("secret") or "").strip()
         mode = normalize_mode(str(body.get("mode") or "live"))
+        if not key or not secret:
+            saved_key, saved_secret = get_saved_creds(mode)
+            key = key or saved_key
+            secret = secret or saved_secret
+        if not key:
+            self._json(400, {"ok": False, "error": "Missing key"})
+            return
         ak = actor_key(mode, key)
         with BOT_STATE_LOCK:
             if ak in BOT_STATE:
@@ -1932,3 +2187,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
