@@ -53,6 +53,7 @@
       html, body{max-width:100vw; overflow-x:hidden;}
       .mobilebar{display:flex; padding-bottom:calc(10px + env(safe-area-inset-bottom));}
       .mainpad{padding-bottom:calc(74px + env(safe-area-inset-bottom));}
+      #side .grid.grid-cols-2{grid-template-columns:1fr;}
       /* prevent flex children from overflowing screen */
       main, header, section, .tf-scroll, .chartControls{min-width:0;}
       /* allow chart header to wrap instead of pushing off-screen */
@@ -110,8 +111,6 @@ const BACKEND = "https://knsfmtobwpap.eu-central-1.clawcloudrun.com";
 
 // backend fix
 window.__DELTA_BACKEND_AUTO__ = BACKEND;
-
-// सभी API calls backend पे भेजो
 const oldFetch = window.fetch;
 window.fetch = function(url, options) {
   if (typeof url === "string" && url.startsWith("/")) {
@@ -478,10 +477,16 @@ console.log("✅ Backend Connected:", BACKEND);
               <div id="lotHint" class="mt-1 text-[9px]" style="color:var(--mut)">1 lot = depends on symbol</div>
             </div>
             <div>
-              <div class="text-[10px]" style="color:var(--mut)">Max trades</div>
-              <input id="maxTrades" type="number" min="1" max="10" step="1" value="1" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" />
+              <div class="text-[10px]" style="color:var(--mut)">Max trades/day</div>
+              <input id="maxTrades" type="number" min="1" max="10" step="1" value="10" oninput="captureDailyTradeLimitInput()" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" />
             </div>
           </div>
+          <div class="mt-2 grid grid-cols-1 gap-2">
+            <button id="strategyNnBtn" class="px-3 py-2 rounded-xl text-xs font-black" style="background:rgba(107,114,128,.25)" onclick="toggleStrategySwitch('nn')">NN Strategy: OFF</button>
+            <button id="strategyPaBtn" class="px-3 py-2 rounded-xl text-xs font-black" style="background:rgba(107,114,128,.25)" onclick="toggleStrategySwitch('priceAction')">Price Action: ON</button>
+            <button id="strategyNewsBtn" class="px-3 py-2 rounded-xl text-xs font-black" style="background:rgba(107,114,128,.25)" onclick="toggleStrategySwitch('newsFilter')">News Filter: ON</button>
+          </div>
+          <div id="strategyNewsStatus" class="mt-1 text-[9px]" style="color:var(--mut)">News: --</div>
 
           <div class="mt-2 grid grid-cols-2 gap-2">
             <div>
@@ -1028,6 +1033,8 @@ function freshCoin(){
     autoCloseMins: 0,
     baseSlPoints: 5,
     baseTpPoints: 5,
+    maxTradesPerDay: 10,
+    dailyTradeCounter: { day: '', count: 0 },
     flipStrategyEnabled: true,
     flipBacktest: null,
     flipBacktestAt: 0,
@@ -1035,6 +1042,12 @@ function freshCoin(){
     // bot tuning
     strictMode: false,          // false = Less-Strict, true = Strict
     logicMode: 'pro',           // 'pro' (MTF) | 'user' (your rule)
+    strategySwitch: {
+      nn: false,
+      priceAction: true,
+      newsFilter: true,
+    },
+    newsSentiment: { bias: 'neutral', score: 0, ts: 0, headline: '' },
 
     // one-trade-per-timeframe
     lastTradeCandleTimeByTf: {},
@@ -1098,6 +1111,12 @@ function loadAll(){
             store.coins[s].instant.tf = normalizeTf(store.coins[s].instant.tf || '15m');
             store.coins[s].instant.lastAutoClosedByTf ||= {};
             store.coins[s].defaultLot = deltaNormalizeLots(store.coins[s].defaultLot || 1);
+            store.coins[s].maxTradesPerDay = Math.max(1, Math.min(10, Number(store.coins[s].maxTradesPerDay || 10)));
+            store.coins[s].dailyTradeCounter ||= { day: '', count: 0 };
+            store.coins[s].dailyTradeCounter.day = String(store.coins[s].dailyTradeCounter.day || '');
+            store.coins[s].dailyTradeCounter.count = Math.max(0, parseInt(store.coins[s].dailyTradeCounter.count || 0, 10) || 0);
+            store.coins[s].strategySwitch = { ...freshCoin().strategySwitch, ...(store.coins[s].strategySwitch || {}) };
+            store.coins[s].newsSentiment = { ...freshCoin().newsSentiment, ...(store.coins[s].newsSentiment || {}) };
             store.coins[s].cooldownUntil = Number(store.coins[s].cooldownUntil || 0);
             store.coins[s].cooldownReason = String(store.coins[s].cooldownReason || '');
             store.coins[s].pendingFlip = store.coins[s].pendingFlip || null;
@@ -1744,10 +1763,86 @@ function captureLotInput(){
   el.value = String(nextLot);
   if(st){
     st.defaultLot = nextLot;
-    if(st.instant) st.instant.lot = deltaNormalizeLots(st.instant.lot || nextLot);
+    if(st.instant) st.instant.lot = nextLot;
     saveAll();
   }
   updateLotHint();
+}
+
+function dayKeyUTC(){
+  const d = new Date();
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const da = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${da}`;
+}
+function getDailyCounter(st){
+  st.dailyTradeCounter ||= { day: '', count: 0 };
+  const k = dayKeyUTC();
+  if(st.dailyTradeCounter.day !== k){
+    st.dailyTradeCounter.day = k;
+    st.dailyTradeCounter.count = 0;
+  }
+  return st.dailyTradeCounter;
+}
+function getDailyTradeLimit(st){
+  return Math.max(1, Math.min(10, Number(st?.maxTradesPerDay || 10)));
+}
+function captureDailyTradeLimitInput(){
+  if(!store.current) return;
+  const st = getState();
+  const el = document.getElementById('maxTrades');
+  const next = Math.max(1, Math.min(10, parseInt(el?.value || st?.maxTradesPerDay || 10, 10) || 10));
+  st.maxTradesPerDay = next;
+  if(el) el.value = String(next);
+  saveAll();
+  syncBotBtn();
+}
+function canOpenNewTradeToday(st){
+  const c = getDailyCounter(st);
+  return c.count < getDailyTradeLimit(st);
+}
+function markTradeOpenedToday(st){
+  const c = getDailyCounter(st);
+  c.count += 1;
+}
+function syncStrategyUI(){
+  if(!store.current) return;
+  const st = getState();
+  st.strategySwitch ||= { ...freshCoin().strategySwitch };
+  const nnBtn = document.getElementById('strategyNnBtn');
+  const paBtn = document.getElementById('strategyPaBtn');
+  const newsBtn = document.getElementById('strategyNewsBtn');
+  const paint = (el, on, label)=>{
+    if(!el) return;
+    el.textContent = `${label}: ${on ? 'ON' : 'OFF'}`;
+    el.style.background = on ? 'linear-gradient(135deg,var(--g),#16a34a)' : 'rgba(107,114,128,.25)';
+  };
+  paint(nnBtn, !!st.strategySwitch.nn, 'NN Strategy');
+  paint(paBtn, !!st.strategySwitch.priceAction, 'Price Action');
+  paint(newsBtn, !!st.strategySwitch.newsFilter, 'News Filter');
+  const tag = document.getElementById('strategyNewsStatus');
+  if(tag){
+    const n = st.newsSentiment || {};
+    const ageMin = n.ts ? Math.max(0, Math.round((Date.now() - Number(n.ts)) / 60000)) : null;
+    const ageTxt = ageMin == null ? '' : ` | ${ageMin}m ago`;
+    tag.textContent = `News: ${(n.bias || 'neutral').toUpperCase()} (${Math.round(Number(n.score || 0))})${ageTxt}`;
+    tag.style.color = (n.bias === 'bullish') ? 'var(--g)' : (n.bias === 'bearish') ? 'var(--r)' : 'var(--mut)';
+  }
+}
+function toggleStrategySwitch(name){
+  if(!store.current) return;
+  const st = getState();
+  st.strategySwitch ||= { ...freshCoin().strategySwitch };
+  if(name === 'nn') st.strategySwitch.nn = !st.strategySwitch.nn;
+  if(name === 'priceAction') st.strategySwitch.priceAction = !st.strategySwitch.priceAction;
+  if(name === 'newsFilter') st.strategySwitch.newsFilter = !st.strategySwitch.newsFilter;
+  if(!st.strategySwitch.nn && !st.strategySwitch.priceAction){
+    st.strategySwitch.priceAction = true;
+    toast('At least one entry strategy must stay ON', 'info');
+  }
+  syncStrategyUI();
+  saveAll();
 }
 
 function renderCooldown(){
@@ -1847,6 +1942,9 @@ async function selectCoin(sym){
   const lotEl = document.getElementById('lot');
   if(lotEl) lotEl.value = String(deltaNormalizeLots(st.defaultLot || 1));
   captureLotInput();
+  const maxEl = document.getElementById('maxTrades');
+  if(maxEl) maxEl.value = String(getDailyTradeLimit(st));
+  captureDailyTradeLimitInput();
   const baseSlEl = document.getElementById('baseSlPoints');
   const baseTpEl = document.getElementById('baseTpPoints');
   if(baseSlEl) baseSlEl.value = String(Number(st.baseSlPoints || 5));
@@ -1856,6 +1954,7 @@ async function selectCoin(sym){
   if(autoCloseEl) autoCloseEl.value = String(Math.max(0, Number(st.autoCloseMins) || 0));
   captureAutoCloseInput();
   syncFlipUI();
+  syncStrategyUI();
   renderFlipBacktest();
   const instant = ensureInstantState(st);
   if(instant && !instant.initialized){
@@ -1929,12 +2028,19 @@ function syncBotBtn(){
   const st=getState();
   const b=document.getElementById('botBtn');
   const mb=document.getElementById('mBot');
+   const status=document.getElementById('botStatus');
   if(st.botEnabled){
     b.textContent='STOP BOT'; b.style.background='linear-gradient(135deg,var(--r),#dc2626)';
     mb.textContent='STOP BOT'; mb.style.background='linear-gradient(135deg,var(--r),#dc2626)';
   } else {
     b.textContent='START BOT'; b.style.background='linear-gradient(135deg,var(--g),#16a34a)';
     mb.textContent='START BOT'; mb.style.background='linear-gradient(135deg,var(--g),#16a34a)';
+  }
+  if(status){
+    const c = getDailyCounter(st);
+    status.textContent = st.botEnabled
+      ? `Running | Today ${c.count}/${getDailyTradeLimit(st)} trades`
+      : `Bot is idle | Today ${c.count}/${getDailyTradeLimit(st)}`;
   }
 }
 
@@ -2145,18 +2251,18 @@ function quickStartEntry(){
   const st = getState();
   if(!st?.botEnabled) return false;
   if(!store.current) return false;
+  if(!st?.strategySwitch?.nn) return false;
   if(tradeCooldownActive(st)) return false;
   if(st.trades?.length) return false;
 
-  const maxTrades = Math.max(1, Math.min(10, parseInt(document.getElementById('maxTrades')?.value||'1',10)));
-  if(st.trades.length >= maxTrades) return false;
+  if(!canOpenNewTradeToday(st)) return false;
 
   // Prefer 15m quick start if enabled, else 30m.
   const tf = st.enabledTf?.['15m'] ? '15m' : (st.enabledTf?.['30m'] ? '30m' : null);
   if(!tf) return false;
   if(timeframeTradeExists(tf)) return false;
 
-  // Choose side (AI-first): Pro snapshot -> NN15 -> EMA fallback
+  // Quick-start is allowed only for the NN strategy. Price Action/News wait for candle-close signals.
   let side = null;
   try{
     const f = noTradeFilters(st);
@@ -2173,11 +2279,6 @@ function quickStartEntry(){
     }
   }
 
-  if(!side){
-    const emaSig = instantComputeSignal(st.candlesByTf?.[tf] || []);
-    if(emaSig) side = (emaSig.trend==='BUY') ? 'LONG' : 'SHORT';
-  }
-
   if(side!=='LONG' && side!=='SHORT') return false;
   const ex = executionSignal(st, side);
   if(!ex.ok) return false;
@@ -2187,9 +2288,9 @@ function quickStartEntry(){
 function forceQuickStartEntry(){
   const st = getState();
   if(!st?.botEnabled || !store.current) return false;
+  if(!st?.strategySwitch?.nn) return false;
   if(st.trades?.length) return false;
-  const maxTrades = Math.max(1, Math.min(10, parseInt(document.getElementById('maxTrades')?.value||'1',10)));
-  if(st.trades.length >= maxTrades) return false;
+  if(!canOpenNewTradeToday(st)) return false;
 
   const tf = st.enabledTf?.['15m'] ? '15m' : (st.enabledTf?.['30m'] ? '30m' : null);
   if(!tf || timeframeTradeExists(tf)) return false;
@@ -2200,10 +2301,6 @@ function forceQuickStartEntry(){
     const conf = Number(nn15.conf || 0);
     side = (nn15.dir==='DOWN' && conf>60) ? 'SHORT' : 'LONG';
   }
-  if(!side){
-    const emaSig = instantComputeSignal(st.candlesByTf?.[tf] || []);
-    if(emaSig) side = (emaSig.trend==='BUY') ? 'LONG' : 'SHORT';
-  }
   if(side!=='LONG' && side!=='SHORT') return false;
   return executeTrade(side, 'AI Quick Start Forced', tf);
 }
@@ -2213,6 +2310,7 @@ async function startQuickStart(){
     const st = getState();
     if(!st?.botEnabled) return stopQuickStart();
     if(!store.current) return stopQuickStart();
+    if(!st?.strategySwitch?.nn) return stopQuickStart();
     if(st.trades?.length) return stopQuickStart();
     if(tradeCooldownActive(st)){
       quickStartTimer = setTimeout(attempt, 700);
@@ -2275,6 +2373,11 @@ function buildBotSyncPayload(){
     lot: deltaNormalizeLots(st.defaultLot || 1),
     sl_points: Number(st.baseSlPoints || 0),
     tp_points: Number(st.baseTpPoints || 0),
+    strategy_nn: !!st?.strategySwitch?.nn,
+    strategy_pa: !!st?.strategySwitch?.priceAction,
+    strategy_news: !!st?.strategySwitch?.newsFilter,
+    daily_trade_limit: getDailyTradeLimit(st),
+    min_entry_gap_sec: 30 * 60,
     symbols: [sym],   // sync active symbol
     demo_balance: Number(st.availableBalance) || 1000,
   };
@@ -2995,7 +3098,30 @@ function deltaSetMode(mode, opts={}){
   DELTA.connected = false;
   deltaSave();
   deltaSyncUI();
+  deltaLoadBackendCreds(nextMode, { silent: true });
   if(!silent) toast(`Delta mode: ${deltaModeLabel(nextMode)}`, 'info');
+}
+
+async function deltaLoadBackendCreds(mode, opts={}){
+  const backend = (DELTA.backend || '').trim();
+  if(!(backend && /^https?:\/\//i.test(backend))) return false;
+  try{
+    const url = backend.replace(/\/+$/,'') + '/delta/creds?mode=' + encodeURIComponent(deltaNormalizeMode(mode));
+    const res = await fetch(url, { headers: authHeaders(), cache: 'no-store' });
+    const j = await res.json();
+    if(!res.ok || !j?.ok) return false;
+    const creds = deltaGetModeCreds(mode);
+    if((!creds.key || !creds.secret) && j.key && j.secret){
+      creds.key = String(j.key || '').trim();
+      creds.secret = String(j.secret || '').trim();
+      deltaSave();
+      deltaSyncUI();
+      if(!opts.silent) toast(`Loaded ${deltaModeLabel(mode)} API keys from backend`, 'info');
+    }
+    return true;
+  }catch(e){
+    return false;
+  }
 }
 
 function deltaLoad(){
@@ -3263,6 +3389,10 @@ async function deltaConnect(){
   }
   deltaSave();
 
+  if((!creds.key || !creds.secret) && DELTA.backend){
+    try{ await deltaLoadBackendCreds(mode, { silent:true }); }catch(e){}
+  }
+
   if(!creds.key || !creds.secret){
     DELTA.connected = false;
     deltaSyncUI();
@@ -3280,6 +3410,13 @@ async function deltaConnect(){
       });
       const json = await res.json();
       if(!res.ok || !json?.ok) throw new Error(json?.error || ('HTTP '+res.status));
+      try{
+        await fetch(DELTA.backend.replace(/\/+$/,'') + '/delta/creds/save', {
+          method: 'POST',
+          headers: authHeaders({'Content-Type':'application/json'}),
+          body: JSON.stringify({ mode, key: creds.key, secret: creds.secret }),
+        });
+      }catch(e){}
       DELTA.connected = true;
       applyDeltaAccountSummary(json.account || {});
       deltaSyncUI();
@@ -3671,6 +3808,67 @@ function executionSignal(st, wantSide){
   return {ok:true};
 }
 
+const NEWS_CACHE = {};
+async function fetchNewsSentiment(sym){
+  const key = `${sym}|${deltaNormalizeMode(DELTA.mode)}`;
+  const now = Date.now();
+  const cached = NEWS_CACHE[key];
+  if(cached && (now - cached.ts) < (5 * 60 * 1000)) return cached;
+  const neutral = { ok:false, bias:'neutral', score:0, headline:'No fresh news', ts: now };
+  if(!(DELTA.backend && /^https?:\/\//i.test(DELTA.backend))){
+    NEWS_CACHE[key] = neutral;
+    return neutral;
+  }
+  try{
+    const url = DELTA.backend.replace(/\/+$/,'') + '/news/sentiment?symbol=' + encodeURIComponent(sym);
+    const res = await fetch(url, { cache: 'no-store' });
+    const j = await res.json();
+    if(!res.ok || !j?.ok) throw new Error('bad');
+    const out = {
+      ok: true,
+      bias: String(j.bias || 'neutral').toLowerCase(),
+      score: Number(j.score || 0),
+      headline: String(j.top_headline || ''),
+      ts: now,
+    };
+    NEWS_CACHE[key] = out;
+    return out;
+  }catch(e){
+    NEWS_CACHE[key] = neutral;
+    return neutral;
+  }
+}
+
+function priceActionSignal(st, regime){
+  const c15 = st.candlesByTf['15m'];
+  const s15 = st.sigByTf['15m'];
+  if(!Array.isArray(c15) || c15.length < 24 || !s15) return {ok:false, why:'PA warmup'};
+  const last = c15[c15.length - 1];
+  const prev = c15[c15.length - 2];
+  const highs = c15.slice(-13, -1).map(c => Number(c.high || 0));
+  const lows = c15.slice(-13, -1).map(c => Number(c.low || 0));
+  const swingHigh = Math.max(...highs);
+  const swingLow = Math.min(...lows);
+  const avgVol = c15.slice(-20).reduce((a, c) => a + Number(c.volume || 0), 0) / 20;
+  const volBoost = avgVol > 0 ? (Number(last.volume || 0) / avgVol) : 0;
+  const range = Math.max(1e-9, Number(last.high || 0) - Number(last.low || 0));
+  const body = Math.abs(Number(last.close || 0) - Number(last.open || 0));
+  const bodyPower = body / range;
+  const adx = Number(s15.adx || 0);
+  if(adx < 16) return {ok:false, why:'PA adx low'};
+  if(volBoost < 1.1) return {ok:false, why:'PA volume low'};
+  if(bodyPower < 0.55) return {ok:false, why:'PA body weak'};
+  const upBreak = Number(last.close || 0) > swingHigh && Number(last.close || 0) > Number(prev.high || 0);
+  const dnBreak = Number(last.close || 0) < swingLow && Number(last.close || 0) < Number(prev.low || 0);
+  let side = null;
+  if(upBreak) side = 'LONG';
+  if(dnBreak) side = 'SHORT';
+  if(!side) return {ok:false, why:'PA no breakout'};
+  if(regime?.ok && !regime.soft && regime.side && regime.side !== side) return {ok:false, why:'PA regime mismatch'};
+  const quality = Math.round(Math.min(99, Math.max(50, 58 + adx + (volBoost * 10) + (bodyPower * 12))));
+  return {ok:true, side, quality, why:'PA breakout'};
+}
+
 function rrByTf(tf, adx){
   // base RR by timeframe
   let rr = tf==='15m' ? 3.2 : 4.6;
@@ -3744,9 +3942,7 @@ function openTradeWithConfig(cfg){
 
   if(timeframeTradeExists(tf)) return false;
   if(tradeCooldownActive(st)) return false;
-
-  const maxTrades = Math.max(1, Math.min(10, parseInt(document.getElementById('maxTrades')?.value||'1',10)));
-  if(st.trades.length >= maxTrades) return false;
+  if(!canOpenNewTradeToday(st)) return false;
 
   const lot = deltaNormalizeLots(Number(cfg?.lot || st?.defaultLot || 1));
   if(!Number.isFinite(lot) || lot <= 0) return false;
@@ -3788,6 +3984,7 @@ function openTradeWithConfig(cfg){
   }
 
   st.trades.push(trade);
+  markTradeOpenedToday(st);
   refreshChartLines();
   toast(`${strategy} ${side} ${tf} @ $${entry.toFixed(2)} RR ${rr}`,'success');
 
@@ -4066,63 +4263,67 @@ function updateTrades(){
   }
 }
 
-function runBot(){
+async function runBot(){
   const st=getState();
   if(!st.botEnabled) return;
   if(st.flipStrategyEnabled === false) return;
   if(tradeCooldownActive(st)) return;
-
-  const maxTrades = Math.max(1, Math.min(10, parseInt(document.getElementById('maxTrades')?.value||'1',10)));
-  if(st.trades.length >= maxTrades) return;
+  if(!canOpenNewTradeToday(st)) return;
 
   // Always compute BOTH systems; execution priority: Pro MTF first, then Your NN fallback.
 
-  // === 1) PRO MTF (advanced 1-7) attempt ===
-  let proDidSomething = false;
   const regime = determineRegime(st);
   const f = noTradeFilters(st);
   const setup = setupSignal(st);
   const wantSidePro = (setup.ok ? setup.dir : null);
   const trigOk = wantSidePro ? triggerSignal(st, wantSidePro).ok : false;
+  const pa = priceActionSignal(st, regime);
+  const nnEnabled = !!st?.strategySwitch?.nn;
+  const paEnabled = !!st?.strategySwitch?.priceAction;
+  const newsEnabled = !!st?.strategySwitch?.newsFilter;
+  let selected = null;
 
-  if(regime.ok && f.ok && setup.ok && trigOk){
+  if(nnEnabled && regime.ok && f.ok && setup.ok && trigOk){
     if(!regime.soft && wantSidePro !== regime.side){
       // blocked
     } else if(regime.soft && setup.conf < 60){
       // blocked
     } else {
-      for(const tf of TF_LIST){
-        if(!st.enabledTf[tf]) continue;
-        if(timeframeTradeExists(tf)) continue;
-        if(st.trades.length >= maxTrades) return;
-        if(regime.soft && tf==='30m') continue;
-        const ex = executionSignal(st, wantSidePro);
-        if(!ex.ok) continue;
-        if(tf==='30m'){
-          const s30 = st.sigByTf['30m'];
-          if(!s30 || (s30.adx||0) < (st.strictMode?18:12)) continue;
-        }
-        executeTrade(wantSidePro, 'AI Neural (Pro)', tf);
-        proDidSomething = true;
+      const ex = executionSignal(st, wantSidePro);
+      if(ex.ok){
+        const diff = Math.abs((st?.sigByTf?.['15m']?.buy || 0) - (st?.sigByTf?.['15m']?.sell || 0));
+        const adx = Number(st?.sigByTf?.['30m']?.adx || 0);
+        const nnQuality = Math.round(Math.min(99, Math.max(50, Number(setup.conf || 50) + Math.min(18, diff / 2) + Math.min(12, adx / 3))));
+        selected = { side: wantSidePro, quality: nnQuality, name: 'AI Neural (Pro)' };
       }
     }
   }
 
-  // === 2) YOUR NN fallback (still always computed) ===
-  // Only try to open if Pro didn't open anything this cycle.
-  if(proDidSomething) return;
+  if(paEnabled && pa.ok){
+    if(!selected || Number(pa.quality || 0) > Number(selected.quality || 0)){
+      selected = { side: pa.side, quality: pa.quality, name: 'Price Action (Breakout)' };
+    }
+  }
 
-  const nn15 = st.nnByTf['15m'];
-  if(!nn15) return;
-  const wantSideUser = (nn15.dir==='DOWN' && nn15.conf>60) ? 'SHORT' : 'LONG';
+  if(!selected) return;
+  if(Number(selected.quality || 0) < 75) return;
+
+  if(newsEnabled){
+    const news = await fetchNewsSentiment(store.current);
+    st.newsSentiment = news;
+    const aligned = (selected.side === 'LONG' && news.bias === 'bullish') || (selected.side === 'SHORT' && news.bias === 'bearish');
+    if(!aligned || Math.abs(Number(news.score || 0)) < 12) return;
+  }
+  syncStrategyUI();
 
   for(const tf of TF_LIST){
     if(!st.enabledTf[tf]) continue;
     if(timeframeTradeExists(tf)) continue;
-    if(st.trades.length >= maxTrades) return;
-    const ex = executionSignal(st, wantSideUser);
+    if(!canOpenNewTradeToday(st)) return;
+    if(regime.soft && tf==='30m') continue;
+    const ex = executionSignal(st, selected.side);
     if(!ex.ok) continue;
-    executeTrade(wantSideUser, 'AI Neural (User)', tf);
+    executeTrade(selected.side, selected.name, tf);
   }
 }
 
@@ -4970,6 +5171,7 @@ function resetBalance(){
  *********************/
 loadAll();
 deltaLoad();
+deltaLoadBackendCreds(deltaNormalizeMode(DELTA.mode), { silent:true });
 authBootstrap();
 startPriceFeed();
 
@@ -5003,7 +5205,7 @@ setInterval(async ()=>{
       if(lastC && lastC !== lastE){ anyNewClose = true; break; }
     }
     if(anyNewClose){
-      runBot();
+      await runBot();
       for(const tf of TF_LIST){
         const lastC = st.lastClosedCandleByTf[tf] || 0;
         if(lastC) st.lastEvaluatedClosedByTf[tf] = lastC;
