@@ -299,7 +299,7 @@ console.log("✅ Backend Connected:", BACKEND);
         <!-- Analytics tab -->
         <section id="tab_analytics" class="hidden flex-1 overflow-y-auto">
           <div class="p-3 space-y-3">
-            <div class="glass rounded-2xl p-4 border">
+            <div class="glass rounded-2xl p-4 border hidden">
               <div class="text-sm font-black">Performance</div>
               <div class="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <div class="rounded-xl p-3" style="background:var(--bg3)"><div class="text-[10px]" style="color:var(--mut)">Wins</div><div class="text-lg font-black" id="wins">0</div></div>
@@ -320,8 +320,8 @@ console.log("✅ Backend Connected:", BACKEND);
             <div class="glass rounded-2xl p-4 border">
               <div class="flex items-center justify-between gap-2">
                 <div>
-                  <div class="text-sm font-black">Flip Strategy Backtest</div>
-                  <div class="text-[10px]" style="color:var(--mut)">Purani NN flip strategy on Delta historical candles</div>
+                  <div class="text-sm font-black">Legacy Backtest</div>
+                  <div class="text-[10px]" style="color:var(--mut)">Disabled in PA + News build</div>
                 </div>
                 <button class="px-3 py-2 rounded-xl text-xs font-black" style="background:var(--acc)" onclick="runFlipBacktest()">Refresh</button>
               </div>
@@ -392,7 +392,6 @@ console.log("✅ Backend Connected:", BACKEND);
               <span class="font-black" style="color:var(--txt)">Pro (MTF) Exit Rules</span>:
               <span style="color:var(--txt)">Hard SL/TP</span> |
               <span style="color:var(--txt)">Profit Lock (only if ON)</span> |
-              <span style="color:var(--txt)">NN Flip on candle close</span> |
               <span style="color:var(--txt)">Manual Close / Close All</span>
             </div>
             <details class="mt-1" style="text-align:left">
@@ -401,13 +400,13 @@ console.log("✅ Backend Connected:", BACKEND);
                 <div><b style="color:var(--txt)">1) Hard SL</b>: LONG closes when <code>price &lt;= SL</code>; SHORT closes when <code>price &gt;= SL</code>.</div>
                 <div><b style="color:var(--txt)">2) Hard TP</b>: LONG closes when <code>price &gt;= TP</code>; SHORT closes when <code>price &lt;= TP</code>.</div>
                 <div><b style="color:var(--txt)">3) Profit Lock (if ON)</b>: lock activates at profit threshold, trade continues; closes only if <code>price hits LockSL</code>.</div>
-                <div><b style="color:var(--txt)">4) NN Flip</b>: checked <u>after candle close</u>. If 15m NN confidence &gt;= 65% and direction flips vs your open trade, bot closes that trade (reason: <code>NN Flip</code>) and can open opposite in the same TF.</div>
+                <div><b style="color:var(--txt)">4) PA + News</b>: bot opens only when Price Action or strong News signal appears.</div>
               </div>
             </details>
           </div>
         </div>
 
-        <div class="p-4 border-b" style="border-color:var(--b)">
+        <div class="p-4 border-b hidden" style="border-color:var(--b)">
           <div class="text-sm font-black" style="color:var(--p)">AI Neural Network</div>
           <div class="mt-3 rounded-2xl p-3" style="background:linear-gradient(135deg,var(--bg3),var(--bg2)); border:1px solid rgba(99,102,241,.5)">
             <div class="flex justify-between text-xs"><span style="color:var(--mut)">Setup NN (15m)</span><b id="nnDir" style="color:var(--acc)">--</b></div>
@@ -482,9 +481,8 @@ console.log("✅ Backend Connected:", BACKEND);
             </div>
           </div>
           <div class="mt-2 grid grid-cols-1 gap-2">
-            <button id="strategyNnBtn" class="px-3 py-2 rounded-xl text-xs font-black" style="background:rgba(107,114,128,.25)" onclick="toggleStrategySwitch('nn')">NN Strategy: OFF</button>
-            <button id="strategyPaBtn" class="px-3 py-2 rounded-xl text-xs font-black" style="background:rgba(107,114,128,.25)" onclick="toggleStrategySwitch('priceAction')">Price Action: ON</button>
-            <button id="strategyNewsBtn" class="px-3 py-2 rounded-xl text-xs font-black" style="background:rgba(107,114,128,.25)" onclick="toggleStrategySwitch('newsFilter')">News Filter: ON</button>
+            <button id="strategyPaBtn" class="px-3 py-2 rounded-xl text-xs font-black" style="background:linear-gradient(135deg,var(--g),#16a34a)" onclick="toggleStrategySwitch('priceAction')">Price Action: ON</button>
+            <button id="strategyNewsBtn" class="px-3 py-2 rounded-xl text-xs font-black" style="background:linear-gradient(135deg,var(--g),#16a34a)" onclick="toggleStrategySwitch('newsFilter')">News Signal: ON</button>
           </div>
           <div id="strategyNewsStatus" class="mt-1 text-[9px]" style="color:var(--mut)">News: --</div>
 
@@ -495,7 +493,7 @@ console.log("✅ Backend Connected:", BACKEND);
             </div>
             <div>
               <div class="text-[10px]" style="color:var(--mut)">Logic</div>
-              <div class="w-full px-3 py-2 rounded-xl text-[11px] font-black text-center" style="background:rgba(107,114,128,.25)">AUTO (Pro + Your NN)</div>
+              <div class="w-full px-3 py-2 rounded-xl text-[11px] font-black text-center" style="background:rgba(107,114,128,.25)">PA + NEWS ONLY</div>
             </div>
           </div>
 
@@ -517,17 +515,17 @@ console.log("✅ Backend Connected:", BACKEND);
           </div>
 
           <div class="mt-3 text-[10px]" style="color:var(--mut)">
-            One trade per timeframe is enforced (15m/30m). Trades will be tagged as AI Neural (Pro) or AI Neural (User).
+            One trade per timeframe is enforced (15m/30m). Trades open only on Price Action or strong News signals.
           </div>
         </div>
 
-        <div class="p-4 border-b" style="border-color:var(--b)">
+        <div class="p-4 border-b hidden" style="border-color:var(--b)">
           <div class="flex items-center justify-between gap-2">
             <div class="text-sm font-black" style="color:var(--p)">Flip Strategy</div>
             <button id="flipBacktestBtn" class="px-3 py-2 rounded-xl text-[11px] font-black" style="background:var(--acc)" onclick="runFlipBacktest()">1Y Backtest</button>
           </div>
           <div class="mt-2 text-[10px]" style="color:var(--mut)">
-            Sirf tumhari purani NN flip strategy. Bot isi ko use karega.
+            Disabled in PA + News build.
           </div>
           <div class="mt-3 flex items-center gap-2">
             <button id="flipToggleBtn" class="px-3 py-2 rounded-xl text-xs font-black" style="background:linear-gradient(135deg,var(--g),#16a34a)" onclick="toggleFlipStrategy()">Flip Strategy: ON</button>
@@ -1035,7 +1033,7 @@ function freshCoin(){
     baseTpPoints: 5,
     maxTradesPerDay: 10,
     dailyTradeCounter: { day: '', count: 0 },
-    flipStrategyEnabled: true,
+    flipStrategyEnabled: false,
     flipBacktest: null,
     flipBacktestAt: 0,
 
@@ -1099,7 +1097,7 @@ function loadAll(){
             store.coins[s].tf = normalizeTf(store.coins[s].tf);
             store.coins[s].candlesByTf = createTfCandleMap(store.coins[s].candlesByTf);
             store.coins[s].enabledTf = createTfEnabledMap(store.coins[s].enabledTf);
-            store.coins[s].flipStrategyEnabled = store.coins[s].flipStrategyEnabled !== false;
+            store.coins[s].flipStrategyEnabled = false;
             store.coins[s].flipBacktest ||= null;
             store.coins[s].flipBacktestAt ||= 0;
             store.coins[s].lastTradeCandleTimeByTf ||= {};
@@ -1115,7 +1113,7 @@ function loadAll(){
             store.coins[s].dailyTradeCounter ||= { day: '', count: 0 };
             store.coins[s].dailyTradeCounter.day = String(store.coins[s].dailyTradeCounter.day || '');
             store.coins[s].dailyTradeCounter.count = Math.max(0, parseInt(store.coins[s].dailyTradeCounter.count || 0, 10) || 0);
-            store.coins[s].strategySwitch = { ...freshCoin().strategySwitch, ...(store.coins[s].strategySwitch || {}) };
+            store.coins[s].strategySwitch = { nn: false, priceAction: true, newsFilter: true };
             store.coins[s].newsSentiment = { ...freshCoin().newsSentiment, ...(store.coins[s].newsSentiment || {}) };
             store.coins[s].cooldownUntil = Number(store.coins[s].cooldownUntil || 0);
             store.coins[s].cooldownReason = String(store.coins[s].cooldownReason || '');
@@ -1728,31 +1726,13 @@ function startTradeCooldown(reason='Trade cooldown'){
 
 function queuePendingFlip(side, tf, reason){
   const st = getState();
-  if(!st || !side || !tf) return;
-  st.pendingFlip = {
-    side,
-    tf: normalizeTf(tf),
-    reason: String(reason || 'Flip queued'),
-    createdAt: Date.now(),
-  };
+  if(st) st.pendingFlip = null;
 }
 
 function maybeRunPendingFlip(){
   const st = getState();
-  const pending = st?.pendingFlip;
-  if(!st || !pending || !st.botEnabled) return false;
-  if(tradeCooldownActive(st)) return false;
-  if(Date.now() - Number(pending.createdAt || 0) > (10 * 60 * 1000)){
-    st.pendingFlip = null;
-    return false;
-  }
-  if(timeframeTradeExists(pending.tf)){
-    st.pendingFlip = null;
-    return false;
-  }
-  const opened = executeTrade(pending.side, 'AI Neural Flip', pending.tf);
-  if(opened) st.pendingFlip = null;
-  return opened;
+  if(st) st.pendingFlip = null;
+  return false;
 }
 
 function captureLotInput(){
@@ -1809,8 +1789,7 @@ function markTradeOpenedToday(st){
 function syncStrategyUI(){
   if(!store.current) return;
   const st = getState();
-  st.strategySwitch ||= { ...freshCoin().strategySwitch };
-  const nnBtn = document.getElementById('strategyNnBtn');
+  st.strategySwitch = { nn: false, priceAction: true, newsFilter: true };
   const paBtn = document.getElementById('strategyPaBtn');
   const newsBtn = document.getElementById('strategyNewsBtn');
   const paint = (el, on, label)=>{
@@ -1818,9 +1797,8 @@ function syncStrategyUI(){
     el.textContent = `${label}: ${on ? 'ON' : 'OFF'}`;
     el.style.background = on ? 'linear-gradient(135deg,var(--g),#16a34a)' : 'rgba(107,114,128,.25)';
   };
-  paint(nnBtn, !!st.strategySwitch.nn, 'NN Strategy');
   paint(paBtn, !!st.strategySwitch.priceAction, 'Price Action');
-  paint(newsBtn, !!st.strategySwitch.newsFilter, 'News Filter');
+  paint(newsBtn, !!st.strategySwitch.newsFilter, 'News Signal');
   const tag = document.getElementById('strategyNewsStatus');
   if(tag){
     const n = st.newsSentiment || {};
@@ -1833,14 +1811,8 @@ function syncStrategyUI(){
 function toggleStrategySwitch(name){
   if(!store.current) return;
   const st = getState();
-  st.strategySwitch ||= { ...freshCoin().strategySwitch };
-  if(name === 'nn') st.strategySwitch.nn = !st.strategySwitch.nn;
-  if(name === 'priceAction') st.strategySwitch.priceAction = !st.strategySwitch.priceAction;
-  if(name === 'newsFilter') st.strategySwitch.newsFilter = !st.strategySwitch.newsFilter;
-  if(!st.strategySwitch.nn && !st.strategySwitch.priceAction){
-    st.strategySwitch.priceAction = true;
-    toast('At least one entry strategy must stay ON', 'info');
-  }
+  st.strategySwitch = { nn: false, priceAction: true, newsFilter: true };
+  toast('PA + News strategy is locked ON in this file', 'info');
   syncStrategyUI();
   saveAll();
 }
@@ -2248,97 +2220,26 @@ async function runFlipBacktest(){
   }
 }
 function quickStartEntry(){
-  const st = getState();
-  if(!st?.botEnabled) return false;
-  if(!store.current) return false;
-  if(!st?.strategySwitch?.nn) return false;
-  if(tradeCooldownActive(st)) return false;
-  if(st.trades?.length) return false;
-
-  if(!canOpenNewTradeToday(st)) return false;
-
-  // Prefer 15m quick start if enabled, else 30m.
-  const tf = st.enabledTf?.['15m'] ? '15m' : (st.enabledTf?.['30m'] ? '30m' : null);
-  if(!tf) return false;
-  if(timeframeTradeExists(tf)) return false;
-
-  // Quick-start is allowed only for the NN strategy. Price Action/News wait for candle-close signals.
-  let side = null;
-  try{
-    const f = noTradeFilters(st);
-    const rg = determineRegime(st);
-    const setup = setupSignal(st);
-    if(f.ok && rg.ok && setup.ok) side = setup.dir;
-  }catch(e){}
-
-  if(!side){
-    const nn15 = st.nnByTf?.['15m'];
-    if(nn15){
-      const conf = Number(nn15.conf || 0);
-      side = (nn15.dir==='DOWN' && conf>60) ? 'SHORT' : 'LONG';
-    }
-  }
-
-  if(side!=='LONG' && side!=='SHORT') return false;
-  const ex = executionSignal(st, side);
-  if(!ex.ok) return false;
-
-  return executeTrade(side, 'AI Quick Start', tf);
+  return false;
 }
 function forceQuickStartEntry(){
-  const st = getState();
-  if(!st?.botEnabled || !store.current) return false;
-  if(!st?.strategySwitch?.nn) return false;
-  if(st.trades?.length) return false;
-  if(!canOpenNewTradeToday(st)) return false;
-
-  const tf = st.enabledTf?.['15m'] ? '15m' : (st.enabledTf?.['30m'] ? '30m' : null);
-  if(!tf || timeframeTradeExists(tf)) return false;
-
-  let side = null;
-  const nn15 = st.nnByTf?.['15m'];
-  if(nn15){
-    const conf = Number(nn15.conf || 0);
-    side = (nn15.dir==='DOWN' && conf>60) ? 'SHORT' : 'LONG';
-  }
-  if(side!=='LONG' && side!=='SHORT') return false;
-  return executeTrade(side, 'AI Quick Start Forced', tf);
+  return false;
 }
 async function startQuickStart(){
   stopQuickStart();
-  const attempt = async ()=>{
-    const st = getState();
-    if(!st?.botEnabled) return stopQuickStart();
-    if(!store.current) return stopQuickStart();
-    if(!st?.strategySwitch?.nn) return stopQuickStart();
-    if(st.trades?.length) return stopQuickStart();
-    if(tradeCooldownActive(st)){
-      quickStartTimer = setTimeout(attempt, 700);
-      return;
-    }
-
-    try{ await pullDeltaCandles(store.current, {fast:true}); }catch(e){}
-    try{ await computeAllTfs(store.current, true); }catch(e){}
-
-    if(quickStartEntry()) return stopQuickStart();
-    if(forceQuickStartEntry()) return stopQuickStart();
-    quickStartTimer = setTimeout(attempt, 900);
-  };
-  attempt();
 }
 
 async function toggleBot(){
   const st=getState();
   st.botEnabled = !st.botEnabled;
+  st.strategySwitch = { nn: false, priceAction: true, newsFilter: true };
   syncBotBtn();
   toast(st.botEnabled?'Bot started':'Bot stopped', st.botEnabled?'success':'info');
   saveAll();
   if(st.botEnabled){
-    let opened = false;
     try{ await pullDeltaCandles(store.current, {fast:true}); }catch(e){}
     try{ await computeAllTfs(store.current, true); }catch(e){}
-    try{ opened = quickStartEntry(); }catch(e){}
-    if(!opened) startQuickStart();
+    stopQuickStart();
     // Sync to backend bot engine (runs 24/7 even when app is closed)
     try{ await backendBotSync(); }catch(e){}
   } else {
@@ -2373,9 +2274,9 @@ function buildBotSyncPayload(){
     lot: deltaNormalizeLots(st.defaultLot || 1),
     sl_points: Number(st.baseSlPoints || 0),
     tp_points: Number(st.baseTpPoints || 0),
-    strategy_nn: !!st?.strategySwitch?.nn,
-    strategy_pa: !!st?.strategySwitch?.priceAction,
-    strategy_news: !!st?.strategySwitch?.newsFilter,
+    strategy_nn: false,
+    strategy_pa: true,
+    strategy_news: true,
     daily_trade_limit: getDailyTradeLimit(st),
     min_entry_gap_sec: 30 * 60,
     symbols: [sym],   // sync active symbol
@@ -3730,10 +3631,10 @@ function getTuning(st){
  * Advanced MTF trading logic (1-7)
  * 1) 30m regime filter (EMA200/EMA50 + ADX)
  * 2) 15m setup + trigger
- * 3) NN + indicator confluence (diff filter)
+ * 3) Price Action breakout + strong News direction
  * 4) no-trade filters (ATR%, spikes, low range)
  * 5) SL/TP scaling by timeframe
- * 6) exits: hard SL/TP + profit lock + NN flip
+ * 6) exits: hard SL/TP + profit lock + manual close
  * 7) no-trade in sideways
  *********************/
 
@@ -3867,6 +3768,58 @@ function priceActionSignal(st, regime){
   if(regime?.ok && !regime.soft && regime.side && regime.side !== side) return {ok:false, why:'PA regime mismatch'};
   const quality = Math.round(Math.min(99, Math.max(50, 58 + adx + (volBoost * 10) + (bodyPower * 12))));
   return {ok:true, side, quality, why:'PA breakout'};
+}
+
+function combinedAlgoSignal(st, regime, pa, news){
+  const s15 = st?.sigByTf?.['15m'];
+  const s30 = st?.sigByTf?.['30m'];
+  if(!s15 || !s30) return { ok:false, why:'warmup' };
+
+  const newsBias = String(news?.bias || 'neutral').toLowerCase();
+  const newsScore = Math.abs(Number(news?.score || 0));
+  const newsSide = newsBias === 'bullish' ? 'LONG' : (newsBias === 'bearish' ? 'SHORT' : null);
+  const regimeSide = regime?.soft ? null : regime?.side;
+
+  let side = null;
+  let quality = 0;
+  let reason = '';
+
+  // Primary edge: higher-timeframe trend + 15m breakout, boosted by aligned news.
+  if(pa?.ok){
+    side = pa.side;
+    quality = Number(pa.quality || 0);
+    reason = 'PA breakout';
+    if(newsSide === side && newsScore >= 6){
+      quality += Math.min(18, newsScore);
+      reason += ' + news aligned';
+    }
+  }
+
+  // Strong news can open a trade by itself, but only with the 30m trend or no clear regime.
+  if(newsSide && newsScore >= 18 && (!regimeSide || regimeSide === newsSide)){
+    const newsQuality = Math.round(Math.min(99, 76 + newsScore));
+    if(!side || newsQuality > quality){
+      side = newsSide;
+      quality = newsQuality;
+      reason = `strong ${newsBias} news`;
+    }
+  }
+
+  if(!side) return { ok:false, why:'no combined signal' };
+  if(regimeSide && regimeSide !== side) return { ok:false, why:'30m trend mismatch' };
+
+  const diff = Math.abs(Number(s15.buy || 0) - Number(s15.sell || 0));
+  const trendOk = side === 'LONG' ? Number(s15.buy || 0) >= Number(s15.sell || 0) : Number(s15.sell || 0) >= Number(s15.buy || 0);
+  if(!trendOk && newsScore < 24) return { ok:false, why:'15m score mismatch' };
+  quality += Math.min(10, diff / 4);
+
+  return {
+    ok: Math.round(quality) >= 75,
+    side,
+    quality: Math.round(Math.min(99, quality)),
+    strategy: 'Combined PA + News',
+    why: reason,
+  };
 }
 
 function rrByTf(tf, adx){
@@ -4057,10 +4010,7 @@ function closeTrade(index, reason){
   saveAll();
   renderAll();
 
-  // If bot stays ON and there is no active trade left, try quick re-entry on the next valid signal.
-  if(st.botEnabled && st.flipStrategyEnabled !== false && st.trades.length === 0){
-    try{ startQuickStart(); }catch(e){}
-  }
+  stopQuickStart();
 }
 
 function closeAllTrades(){
@@ -4226,30 +4176,7 @@ function updateTrades(){
       }
     }
 
-    // 3) NN flip exit (AFTER 15m candle close only)
-    // Rule (as requested):
-    // - If NN says DOWN and conf > 60 => want SHORT, else (DOWN <= 60) => want LONG
-    // - If NN says UP and conf > 60 => want LONG, else (UP <= 60) => want SHORT
-    // Flip is evaluated only once per 15m candle close (prevents intrabar flipping).
-    if(st.botEnabled && pnlUsd < 0){
-      const closed15 = st.lastClosedCandleByTf?.['15m'] || 0;              // seconds
-      const already = st.lastFlipEval15m || 0;
-      const computedAt = st.lastComputedAtByTf?.['15m'] || 0;              // ms
-      const flipReady = closed15 && (closed15 !== already) && (computedAt >= closed15*1000);
-
-      if(flipReady){
-        const nn15 = st.nnByTf['15m'];
-        if(nn15){
-          const conf = nn15.conf || 0;
-          const dir = nn15.dir;
-          const want = (dir==='DOWN') ? (conf>60 ? 'SHORT' : 'LONG')
-                                     : (conf>60 ? 'LONG'  : 'SHORT');
-          if(t.side!==want){
-            toClose.push({i, r:`NN Flip (15m close): ${dir} ${conf}%`, flip: want, tf: t.tf});
-          }
-        }
-      }
-    }
+    // NN flip exits are disabled in this PA + News build.
   }
 
   toClose.sort((a,b)=>b.i-a.i);
@@ -4266,64 +4193,28 @@ function updateTrades(){
 async function runBot(){
   const st=getState();
   if(!st.botEnabled) return;
-  if(st.flipStrategyEnabled === false) return;
   if(tradeCooldownActive(st)) return;
   if(!canOpenNewTradeToday(st)) return;
 
-  // Always compute BOTH systems; execution priority: Pro MTF first, then Your NN fallback.
-
   const regime = determineRegime(st);
-  const f = noTradeFilters(st);
-  const setup = setupSignal(st);
-  const wantSidePro = (setup.ok ? setup.dir : null);
-  const trigOk = wantSidePro ? triggerSignal(st, wantSidePro).ok : false;
   const pa = priceActionSignal(st, regime);
-  const nnEnabled = !!st?.strategySwitch?.nn;
-  const paEnabled = !!st?.strategySwitch?.priceAction;
-  const newsEnabled = !!st?.strategySwitch?.newsFilter;
-  let selected = null;
-
-  if(nnEnabled && regime.ok && f.ok && setup.ok && trigOk){
-    if(!regime.soft && wantSidePro !== regime.side){
-      // blocked
-    } else if(regime.soft && setup.conf < 60){
-      // blocked
-    } else {
-      const ex = executionSignal(st, wantSidePro);
-      if(ex.ok){
-        const diff = Math.abs((st?.sigByTf?.['15m']?.buy || 0) - (st?.sigByTf?.['15m']?.sell || 0));
-        const adx = Number(st?.sigByTf?.['30m']?.adx || 0);
-        const nnQuality = Math.round(Math.min(99, Math.max(50, Number(setup.conf || 50) + Math.min(18, diff / 2) + Math.min(12, adx / 3))));
-        selected = { side: wantSidePro, quality: nnQuality, name: 'AI Neural (Pro)' };
-      }
-    }
-  }
-
-  if(paEnabled && pa.ok){
-    if(!selected || Number(pa.quality || 0) > Number(selected.quality || 0)){
-      selected = { side: pa.side, quality: pa.quality, name: 'Price Action (Breakout)' };
-    }
-  }
-
-  if(!selected) return;
-  if(Number(selected.quality || 0) < 75) return;
-
-  if(newsEnabled){
-    const news = await fetchNewsSentiment(store.current);
-    st.newsSentiment = news;
-    const aligned = (selected.side === 'LONG' && news.bias === 'bullish') || (selected.side === 'SHORT' && news.bias === 'bearish');
-    if(!aligned || Math.abs(Number(news.score || 0)) < 12) return;
-  }
+  const news = await fetchNewsSentiment(store.current);
+  st.newsSentiment = news;
   syncStrategyUI();
+
+  const selected = combinedAlgoSignal(st, regime, pa, news);
+  if(!selected) return;
+  if(!selected.ok) return;
+  if(Number(selected.quality || 0) < 75) return;
 
   for(const tf of TF_LIST){
     if(!st.enabledTf[tf]) continue;
     if(timeframeTradeExists(tf)) continue;
     if(!canOpenNewTradeToday(st)) return;
     if(regime.soft && tf==='30m') continue;
-    const ex = executionSignal(st, selected.side);
+    const ex = selected.why.includes('strong') ? { ok: true } : executionSignal(st, selected.side);
     if(!ex.ok) continue;
-    executeTrade(selected.side, selected.name, tf);
+    executeTrade(selected.side, `${selected.strategy} (${selected.why})`, tf);
   }
 }
 
