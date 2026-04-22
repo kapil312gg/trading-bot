@@ -61,8 +61,11 @@ KNOWN_BAD_PRODUCT_IDS_BY_MODE: dict[str, dict[str, str]] = {
     },
 }
 
-# Path to index.html (same directory as this script)
-INDEX_HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
+# Path to app HTML (same directory as this script)
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+INDEX_HTML_PATH = os.path.join(APP_DIR, "index_price_news.html")
+if not os.path.exists(INDEX_HTML_PATH):
+    INDEX_HTML_PATH = os.path.join(APP_DIR, "index.html")
 PRICE_CACHE_TTL_SEC = 0.35
 CANDLE_CACHE_TTL_SEC = 0.75
 PROFILE_CACHE_TTL_SEC = 5.0
@@ -2065,10 +2068,10 @@ def _patched_do_GET(self: Handler) -> None:
 def _patched_do_POST(self: Handler) -> None:
     parsed = urlparse(self.path)
     path = parsed.path
-    body = self._read_body_json()
 
     if path == "/bot/sync":
         """App syncs its state to the backend bot engine."""
+        body = self._read_body_json()
         session = self._require_auth()
         if session is None:
             return
@@ -2133,6 +2136,7 @@ def _patched_do_POST(self: Handler) -> None:
 
     if path == "/bot/stop":
         """Deactivate bot for this key."""
+        body = self._read_body_json()
         session = self._require_auth()
         if session is None:
             return
