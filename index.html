@@ -107,7 +107,12 @@
     .desktop-grid-2{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;}
   </style>
   <script>
-const BACKEND = "https://knsfmtobwpap.eu-central-1.clawcloudrun.com";
+const BACKEND = "https://kapil12312313-delta-backend.hf.space";
+const OLD_BACKENDS = [
+  "https://knsfmtobwpap.eu-central-1.clawcloudrun.com",
+  "http://127.0.0.1:7860",
+  "http://localhost:7860"
+];
 
 // backend fix
 window.__DELTA_BACKEND_AUTO__ = BACKEND;
@@ -542,8 +547,8 @@ console.log("✅ Backend Connected:", BACKEND);
           <div class="mt-3 grid grid-cols-1 gap-2">
             <div>
               <div class="text-[10px]" style="color:var(--mut)">Backend URL (recommended)</div>
-              <input id="deltaBackend" type="text" placeholder="http://localhost:7860" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" />
-              <div class="mt-1 text-[9px]" style="color:var(--mut)">Run: <code>python delta_backend.py</code> then set this URL.</div>
+              <input id="deltaBackend" type="text" placeholder="https://kapil12312313-delta-backend.hf.space" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" oninput="deltaQueueAutoConnect()" />
+              <div class="mt-1 text-[9px]" style="color:var(--mut)">Recommended: <code>https://kapil12312313-delta-backend.hf.space</code></div>
             </div>
 
             <div class="rounded-xl p-3" style="background:var(--bg3); border:1px solid var(--b)">
@@ -557,7 +562,7 @@ console.log("✅ Backend Connected:", BACKEND);
 
             <div>
               <div class="text-[10px]" style="color:var(--mut)">Account Mode</div>
-              <select id="deltaMode" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" onchange="deltaSetMode(this.value)">
+              <select id="deltaMode" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" onchange="deltaSetMode(this.value); deltaQueueAutoConnect(250);">
                 <option value="live">Delta Exchange (Live)</option>
                 <option value="demo">Delta Exchange Demo</option>
               </select>
@@ -566,11 +571,11 @@ console.log("✅ Backend Connected:", BACKEND);
 
             <div>
               <div class="text-[10px]" style="color:var(--mut)">API Key</div>
-              <input id="deltaKey" type="password" placeholder="Paste Delta API key" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" />
+              <input id="deltaKey" type="password" placeholder="Paste Delta API key" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" oninput="deltaQueueAutoConnect()" />
             </div>
             <div>
               <div class="text-[10px]" style="color:var(--mut)">API Secret</div>
-              <input id="deltaSecret" type="password" placeholder="Paste Delta API secret" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" />
+              <input id="deltaSecret" type="password" placeholder="Paste Delta API secret" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" oninput="deltaQueueAutoConnect()" />
             </div>
 
             <details class="mt-1">
@@ -582,19 +587,19 @@ console.log("✅ Backend Connected:", BACKEND);
                 </div>
                 <div>
                   <div class="text-[10px]" style="color:var(--mut)">BTCUSDT product_id</div>
-                  <input id="deltaProd_BTCUSDT" type="text" placeholder="e.g. 123" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" />
+                  <input id="deltaProd_BTCUSDT" type="text" placeholder="e.g. 123" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" oninput="deltaQueueAutoConnect(900)" />
                 </div>
                 <div>
                   <div class="text-[10px]" style="color:var(--mut)">ETHUSDT product_id</div>
-                  <input id="deltaProd_ETHUSDT" type="text" placeholder="e.g. 456" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" />
+                  <input id="deltaProd_ETHUSDT" type="text" placeholder="e.g. 456" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" oninput="deltaQueueAutoConnect(900)" />
                 </div>
                 <div>
                   <div class="text-[10px]" style="color:var(--mut)">SOLUSDT product_id</div>
-                  <input id="deltaProd_SOLUSDT" type="text" placeholder="e.g. 789" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" />
+                  <input id="deltaProd_SOLUSDT" type="text" placeholder="e.g. 789" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" oninput="deltaQueueAutoConnect(900)" />
                 </div>
                 <div>
                   <div class="text-[10px]" style="color:var(--mut)">PAXGUSDT product_id</div>
-                  <input id="deltaProd_PAXGUSDT" type="text" placeholder="(optional)" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" />
+                  <input id="deltaProd_PAXGUSDT" type="text" placeholder="(optional)" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" oninput="deltaQueueAutoConnect(900)" />
                 </div>
               </div>
               <div class="mt-2 text-[9px]" style="color:var(--mut)">Tip: find product_id via backend: <code>/delta/products</code> or click Auto-fill.</div>
@@ -602,19 +607,21 @@ console.log("✅ Backend Connected:", BACKEND);
 
             <div id="deltaProxyWrap">
               <div class="text-[10px]" style="color:var(--mut)">CORS Proxy (optional, browser-mode)</div>
-              <input id="deltaProxy" type="text" placeholder="https://your-proxy.example" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" />
+              <input id="deltaProxy" type="text" placeholder="https://your-proxy.example" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" oninput="deltaQueueAutoConnect(900)" />
               <div class="mt-1 text-[9px]" style="color:var(--mut)">Use only if you don't run backend.</div>
             </div>
             <div>
               <div class="text-[10px]" style="color:var(--mut)">Max slippage guard (%)</div>
-              <input id="deltaMaxSlip" type="number" min="0.1" max="10" step="0.1" value="1.0" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" />
+              <input id="deltaMaxSlip" type="number" min="0.1" max="10" step="0.1" value="1.0" class="w-full px-3 py-2 rounded-xl" style="background:var(--bg3); border:1px solid var(--b)" oninput="deltaQueueAutoConnect(900)" />
               <div class="mt-1 text-[9px]" style="color:var(--mut)">Order is skipped if Delta bid/ask deviates too much from app price.</div>
             </div>
           </div>
 
           <div class="mt-3 flex gap-2">
-            <button id="deltaConnectBtn" class="flex-1 px-3 py-2 rounded-xl text-xs font-black" style="background:var(--acc)" onclick="deltaConnect()">Connect</button>
-            <button id="deltaLiveBtn" class="flex-1 px-3 py-2 rounded-xl text-xs font-black" style="background:rgba(107,114,128,.25)" onclick="toggleDeltaLive()">Bot -> Delta: OFF</button>
+            <button id="deltaConnectBtn" class="flex-1 px-3 py-2 rounded-xl text-xs font-black" style="background:var(--acc)" onclick="deltaConnect()">Connect Backend</button>
+          </div>
+          <div class="mt-2 rounded-xl px-3 py-2 text-[10px] font-black" style="background:rgba(34,197,94,.12); color:var(--g); border:1px solid rgba(34,197,94,.35)">
+            Auto-connect also stays ON. Delta trading follows START BOT / STOP BOT.
           </div>
 
           <div class="mt-2">
@@ -1010,6 +1017,8 @@ function freshCoin(){
     defaultLot: 1,
     cooldownUntil: 0,
     cooldownReason: '',
+    autoResumeBotAt: 0,
+    autoResumeBot: false,
     pendingFlip: null,
     price: 0,
     prev: 0,
@@ -1117,6 +1126,8 @@ function loadAll(){
             store.coins[s].newsSentiment = { ...freshCoin().newsSentiment, ...(store.coins[s].newsSentiment || {}) };
             store.coins[s].cooldownUntil = Number(store.coins[s].cooldownUntil || 0);
             store.coins[s].cooldownReason = String(store.coins[s].cooldownReason || '');
+            store.coins[s].autoResumeBotAt = Number(store.coins[s].autoResumeBotAt || 0);
+            store.coins[s].autoResumeBot = !!store.coins[s].autoResumeBot;
             store.coins[s].pendingFlip = store.coins[s].pendingFlip || null;
             if(Array.isArray(store.coins[s].trades)){
               store.coins[s].trades = store.coins[s].trades.map(t => ({ ...t, tf: normalizeTf(t?.tf) }));
@@ -1715,11 +1726,58 @@ function tradeCooldownActive(st=getState()){
   return tradeCooldownRemainingMs(st) > 0;
 }
 
+let botAutoResumeTimer = null;
+
+function clearBotAutoResume(st=getState()){
+  if(botAutoResumeTimer) clearTimeout(botAutoResumeTimer);
+  botAutoResumeTimer = null;
+  if(st){
+    st.autoResumeBot = false;
+    st.autoResumeBotAt = 0;
+  }
+}
+
+async function resumeBotAfterCooldown(){
+  const st = getState();
+  if(!st || !st.autoResumeBot) return;
+  if(tradeCooldownActive(st)){
+    scheduleBotAutoResume(st);
+    return;
+  }
+  st.autoResumeBot = false;
+  st.autoResumeBotAt = 0;
+  st.botEnabled = true;
+  DELTA.live = true;
+  syncBotBtn();
+  deltaSave();
+  deltaSyncUI();
+  saveAll();
+  try{ if(!DELTA.connected) await deltaConnect({ silent:true, auto:true }); }catch(e){}
+  try{ await backendBotSync(); }catch(e){}
+}
+
+function scheduleBotAutoResume(st=getState()){
+  if(botAutoResumeTimer) clearTimeout(botAutoResumeTimer);
+  if(!st?.autoResumeBot) return;
+  const wait = Math.max(0, Number(st.autoResumeBotAt || st.cooldownUntil || 0) - Date.now());
+  botAutoResumeTimer = setTimeout(()=>{ resumeBotAfterCooldown(); }, wait + 50);
+}
+
 function startTradeCooldown(reason='Trade cooldown'){
   const st = getState();
   if(!st) return 0;
   st.cooldownUntil = Date.now() + CONFIG.TRADE_COOLDOWN_MS;
   st.cooldownReason = String(reason || 'Trade cooldown');
+  if(st.botEnabled){
+    st.botEnabled = false;
+    st.autoResumeBot = true;
+    st.autoResumeBotAt = st.cooldownUntil;
+    DELTA.live = false;
+    deltaSave();
+    deltaSyncUI();
+    scheduleBotAutoResume(st);
+    try{ backendBotStop(); }catch(e){}
+  }
   renderCooldown();
   return st.cooldownUntil;
 }
@@ -1821,16 +1879,21 @@ function renderCooldown(){
   const el = document.getElementById('tradeCooldown');
   const st = getState();
   if(!el || !st) return;
+  if(st.autoResumeBot && !tradeCooldownActive(st)){
+    resumeBotAfterCooldown();
+  }
   const left = tradeCooldownRemainingMs(st);
   if(left > 0){
     const why = st.cooldownReason ? ` (${st.cooldownReason})` : '';
-    el.textContent = `Cooldown: ${formatCooldown(left)}${why}`;
+    el.textContent = st.autoResumeBot ? `Bot OFF: ${formatCooldown(left)}${why}` : `Cooldown: ${formatCooldown(left)}${why}`;
     el.style.color = 'var(--y)';
+    syncBotBtn();
     return;
   }
   const queued = st.pendingFlip ? ` | pending ${st.pendingFlip.side} ${st.pendingFlip.tf}` : '';
   el.textContent = `Cooldown: ready${queued}`;
   el.style.color = queued ? 'var(--info)' : 'var(--g)';
+  syncBotBtn();
 }
 
 function renderBalanceHeader(){
@@ -2001,18 +2064,29 @@ function syncBotBtn(){
   const b=document.getElementById('botBtn');
   const mb=document.getElementById('mBot');
    const status=document.getElementById('botStatus');
-  if(st.botEnabled){
+  const left = tradeCooldownRemainingMs(st);
+  if(!st.botEnabled && st.autoResumeBot && left > 0){
+    const label = `BOT OFF ${formatCooldown(left)}`;
+    b.textContent=label; b.style.background='rgba(107,114,128,.45)';
+    mb.textContent=label; mb.style.background='rgba(107,114,128,.45)';
+    b.title='Click to cancel auto restart';
+    mb.title='Click to cancel auto restart';
+  } else if(st.botEnabled){
     b.textContent='STOP BOT'; b.style.background='linear-gradient(135deg,var(--r),#dc2626)';
     mb.textContent='STOP BOT'; mb.style.background='linear-gradient(135deg,var(--r),#dc2626)';
+    b.title=''; mb.title='';
   } else {
     b.textContent='START BOT'; b.style.background='linear-gradient(135deg,var(--g),#16a34a)';
     mb.textContent='START BOT'; mb.style.background='linear-gradient(135deg,var(--g),#16a34a)';
+    b.title=''; mb.title='';
   }
   if(status){
     const c = getDailyCounter(st);
-    status.textContent = st.botEnabled
-      ? `Running | Today ${c.count}/${getDailyTradeLimit(st)} trades`
-      : `Bot is idle | Today ${c.count}/${getDailyTradeLimit(st)}`;
+    status.textContent = !st.botEnabled && st.autoResumeBot && left > 0
+      ? `Bot OFF ${formatCooldown(left)} | Auto ON after cooldown`
+      : st.botEnabled
+        ? `Running | Today ${c.count}/${getDailyTradeLimit(st)} trades`
+        : `Bot is idle | Today ${c.count}/${getDailyTradeLimit(st)}`;
   }
 }
 
@@ -2231,18 +2305,48 @@ async function startQuickStart(){
 
 async function toggleBot(){
   const st=getState();
-  st.botEnabled = !st.botEnabled;
+  if(!st.botEnabled && st.autoResumeBot){
+    clearBotAutoResume(st);
+    st.cooldownUntil = 0;
+    st.cooldownReason = '';
+    st.pendingFlip = null;
+    DELTA.live = false;
+    syncBotBtn();
+    deltaSave();
+    deltaSyncUI();
+    renderCooldown();
+    saveAll();
+    try{ await backendBotStop(); }catch(e){}
+    toast('Bot fully stopped', 'info');
+    return;
+  }
+  const shouldStart = !st.botEnabled;
+  st.botEnabled = shouldStart;
+  clearBotAutoResume(st);
+  DELTA.live = shouldStart;
   st.strategySwitch = { nn: false, priceAction: true, newsFilter: true };
   syncBotBtn();
   toast(st.botEnabled?'Bot started':'Bot stopped', st.botEnabled?'success':'info');
   saveAll();
   if(st.botEnabled){
+    if(!DELTA.connected) await deltaConnect({ silent:true, auto:true });
+    DELTA.live = true;
+    deltaSave();
+    deltaSyncUI();
     try{ await pullDeltaCandles(store.current, {fast:true}); }catch(e){}
     try{ await computeAllTfs(store.current, true); }catch(e){}
     stopQuickStart();
     // Sync to backend bot engine (runs 24/7 even when app is closed)
     try{ await backendBotSync(); }catch(e){}
   } else {
+    DELTA.live = false;
+    st.cooldownUntil = 0;
+    st.cooldownReason = '';
+    st.pendingFlip = null;
+    clearBotAutoResume(st);
+    deltaSave();
+    deltaSyncUI();
+    renderCooldown();
     stopQuickStart();
     // Tell backend bot to stop too
     try{ await backendBotStop(); }catch(e){}
@@ -2728,10 +2832,20 @@ function updateLotHint(){
 function deltaApiBase(mode){
   return deltaNormalizeMode(mode)==='demo' ? CONFIG.DELTA_BASE_DEMO : CONFIG.DELTA_BASE_LIVE;
 }
+function deltaDefaultBackend(){
+  return (window.__DELTA_BACKEND_AUTO__ || BACKEND || '').replace(/\/+$/,'');
+}
+function deltaNormalizeBackendUrl(url){
+  const raw = String(url || '').trim().replace(/\/+$/,'');
+  const bad = (window.OLD_BACKENDS || OLD_BACKENDS || []).map(x => String(x || '').replace(/\/+$/,''));
+  if(!raw || bad.includes(raw)) return deltaDefaultBackend();
+  return raw;
+}
 function deltaBackendBase(){
-  const b = String(DELTA.backend || '').trim();
+  const b = deltaNormalizeBackendUrl(DELTA.backend);
+  DELTA.backend = b;
   if(!(b && /^https?:\/\//i.test(b))) return '';
-  return b.replace(/\/+$/,'');
+  return b;
 }
 
 function authHeaders(extra={}){
@@ -2969,7 +3083,7 @@ function deltaRenderIp(){
 async function deltaFetchIp(){
   const backend = document.getElementById('deltaBackend')?.value?.trim() || DELTA.backend || '';
   if(!(backend && /^https?:\/\//i.test(backend))){
-    toast('Set Backend URL first (e.g. http://localhost:7860)', 'error');
+    toast('Set Backend URL first (Hugging Face recommended)', 'error');
     return;
   }
   DELTA.backend = backend;
@@ -3032,7 +3146,7 @@ function deltaLoad(){
       const d = JSON.parse(raw);
       DELTA.live = !!d.live;
       DELTA.proxy = d.proxy || '';
-      DELTA.backend = d.backend || DELTA.backend || 'http://127.0.0.1:7860';
+      DELTA.backend = deltaNormalizeBackendUrl(d.backend || DELTA.backend);
       DELTA.maxSlipPct = Math.max(0.1, Math.min(10, Number(d.maxSlipPct ?? DELTA.maxSlipPct ?? 1.0) || 1.0));
       DELTA.bracket = (d.bracket !== false);
       DELTA.mode = deltaNormalizeMode(d.mode || 'live');
@@ -3072,6 +3186,38 @@ function deltaSave(){
     }));
   }catch(e){}
 }
+
+let _deltaAutoConnectTimer = null;
+let _deltaAutoConnecting = false;
+
+function deltaHasConnectInputs(){
+  const backend = deltaNormalizeBackendUrl(document.getElementById('deltaBackend')?.value?.trim() || DELTA.backend);
+  const key = document.getElementById('deltaKey')?.value?.trim() || deltaActiveCreds()?.key || '';
+  const secret = document.getElementById('deltaSecret')?.value?.trim() || deltaActiveCreds()?.secret || '';
+  return !!(backend && /^https?:\/\//i.test(backend) && key && secret);
+}
+
+function deltaInputsChanged(){
+  const mode = deltaNormalizeMode(document.getElementById('deltaMode')?.value || DELTA.mode);
+  const creds = deltaGetModeCreds(mode);
+  const backend = deltaNormalizeBackendUrl(document.getElementById('deltaBackend')?.value?.trim() || DELTA.backend);
+  const proxy = document.getElementById('deltaProxy')?.value?.trim() || '';
+  const key = document.getElementById('deltaKey')?.value?.trim() || '';
+  const secret = document.getElementById('deltaSecret')?.value?.trim() || '';
+  return mode !== DELTA.mode || backend !== (DELTA.backend || '') || proxy !== (DELTA.proxy || '') || key !== (creds.key || '') || secret !== (creds.secret || '');
+}
+
+function deltaQueueAutoConnect(delay=700){
+  if(_deltaAutoConnectTimer) clearTimeout(_deltaAutoConnectTimer);
+  _deltaAutoConnectTimer = setTimeout(async ()=>{
+    if(deltaInputsChanged()) DELTA.connected = false;
+    if(_deltaAutoConnecting || DELTA.connected || !deltaHasConnectInputs()) return;
+    _deltaAutoConnecting = true;
+    try{ await deltaConnect({ silent:true, auto:true }); }
+    finally{ _deltaAutoConnecting = false; }
+  }, delay);
+}
+
 function deltaSyncUI(){
   const mode = deltaNormalizeMode(DELTA.mode);
   const modeLabel = deltaModeLabel(mode);
@@ -3094,6 +3240,7 @@ function deltaSyncUI(){
     s.placeholder = `Paste Delta ${modeLabel} API secret`;
   }
   if(p) p.value = DELTA.proxy;
+  DELTA.backend = deltaNormalizeBackendUrl(DELTA.backend);
   if(b) b.value = DELTA.backend;
   if(slip) slip.value = String(DELTA.maxSlipPct ?? 1.0);
   deltaRenderIp();
@@ -3114,12 +3261,6 @@ function deltaSyncUI(){
     if(el) el.value = (map?.[sym] ?? '');
   }
 
-  const liveBtn = document.getElementById('deltaLiveBtn');
-  if(liveBtn){
-    liveBtn.textContent = DELTA.live ? 'Bot -> Delta: ON' : 'Bot -> Delta: OFF';
-    liveBtn.style.background = DELTA.live ? 'linear-gradient(135deg,var(--g),#16a34a)' : 'rgba(107,114,128,.25)';
-  }
-
   const bracketBtn = document.getElementById('deltaBracketBtn');
   if(bracketBtn){
     bracketBtn.textContent = DELTA.bracket ? 'Bracket SL/TP: ON' : 'Bracket SL/TP: OFF';
@@ -3128,7 +3269,8 @@ function deltaSyncUI(){
 
   const st = document.getElementById('deltaStatus');
   if(st){
-    st.textContent = DELTA.connected ? `Status: Connected (${modeLabel})` : `Status: Not connected (${modeLabel})`;
+    const trading = DELTA.live ? 'Bot trading ON' : 'Bot trading OFF';
+    st.textContent = DELTA.connected ? `Status: Connected to backend (${modeLabel}) | ${trading}` : `Status: Not connected (${modeLabel})`;
     st.style.color = DELTA.connected ? 'var(--g)' : 'var(--mut)';
   }
   applyEssentialControlsUI();
@@ -3260,10 +3402,34 @@ async function deltaRefreshAccount(opts={}){
   }
 }
 
-async function deltaConnect(){
+async function fetchWithTimeout(url, options={}, timeoutMs=15000){
+  const ctrl = new AbortController();
+  const timer = setTimeout(()=>ctrl.abort(), timeoutMs);
+  try{
+    return await fetch(url, { ...options, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function deltaConnect(opts={}){
+  const silent = !!opts.silent;
+  const connectBtn = document.getElementById('deltaConnectBtn');
+  const oldConnectText = connectBtn ? connectBtn.textContent : '';
+  if(connectBtn && !silent){
+    connectBtn.textContent = 'Connecting...';
+    connectBtn.disabled = true;
+    connectBtn.style.opacity = 0.75;
+  }
   if(AUTH.required && !AUTH.token){
     authSyncUI();
-    return toast('Login first to use Delta actions', 'error');
+    if(!silent) toast('Login first to use Delta actions', 'error');
+    if(connectBtn && !silent){
+      connectBtn.textContent = oldConnectText || 'Connect Backend';
+      connectBtn.disabled = false;
+      connectBtn.style.opacity = 1;
+    }
+    return false;
   }
   DELTA.mode = deltaNormalizeMode(document.getElementById('deltaMode')?.value || DELTA.mode);
   const mode = deltaNormalizeMode(DELTA.mode);
@@ -3272,7 +3438,7 @@ async function deltaConnect(){
   const k = document.getElementById('deltaKey')?.value?.trim() || '';
   const s = document.getElementById('deltaSecret')?.value?.trim() || '';
   const p = document.getElementById('deltaProxy')?.value?.trim() || '';
-  const b = document.getElementById('deltaBackend')?.value?.trim() || '';
+  const b = deltaNormalizeBackendUrl(document.getElementById('deltaBackend')?.value?.trim() || DELTA.backend);
   const slipInput = Number(document.getElementById('deltaMaxSlip')?.value || DELTA.maxSlipPct || 1.0);
 
   const creds = deltaGetModeCreds(mode);
@@ -3280,6 +3446,8 @@ async function deltaConnect(){
   creds.secret = s;
   DELTA.proxy = p;
   DELTA.backend = b;
+  const bEl = document.getElementById('deltaBackend');
+  if(bEl) bEl.value = DELTA.backend;
   DELTA.maxSlipPct = Math.max(0.1, Math.min(10, slipInput || 1.0));
 
   // save product map
@@ -3297,38 +3465,54 @@ async function deltaConnect(){
   if(!creds.key || !creds.secret){
     DELTA.connected = false;
     deltaSyncUI();
-    return toast(`Delta ${modeLabel}: Enter API key + secret`, 'error');
+    if(!silent) toast(`Delta ${modeLabel}: Enter API key + secret`, 'error');
+    if(connectBtn && !silent){
+      connectBtn.textContent = oldConnectText || 'Connect Backend';
+      connectBtn.disabled = false;
+      connectBtn.style.opacity = 1;
+    }
+    return false;
   }
 
   // Prefer Python backend (recommended)
   if(DELTA.backend && /^https?:\/\//i.test(DELTA.backend)){
     try{
       const url = DELTA.backend.replace(/\/+$/,'') + '/delta/test';
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         method:'POST',
         headers: authHeaders({'Content-Type':'application/json'}),
         body: JSON.stringify({ key: creds.key, secret: creds.secret, mode })
-      });
+      }, 15000);
       const json = await res.json();
       if(!res.ok || !json?.ok) throw new Error(json?.error || ('HTTP '+res.status));
       try{
-        await fetch(DELTA.backend.replace(/\/+$/,'') + '/delta/creds/save', {
+        await fetchWithTimeout(DELTA.backend.replace(/\/+$/,'') + '/delta/creds/save', {
           method: 'POST',
           headers: authHeaders({'Content-Type':'application/json'}),
           body: JSON.stringify({ mode, key: creds.key, secret: creds.secret }),
-        });
+        }, 10000);
       }catch(e){}
       DELTA.connected = true;
       applyDeltaAccountSummary(json.account || {});
       deltaSyncUI();
-      toast(`Delta ${modeLabel} connected (backend)`, 'success');
+      if(connectBtn && !silent){
+        connectBtn.textContent = 'Connected';
+        connectBtn.disabled = false;
+        connectBtn.style.opacity = 1;
+      }
+      if(!silent) toast(`Delta ${modeLabel} connected (backend)`, 'success');
       try{ await deltaRefreshAccount({ silent:true }); }catch(e){}
-      return;
+      return true;
     }catch(e){
       DELTA.connected = false;
       deltaSyncUI();
-      toast(`Delta ${modeLabel} backend connect failed`, 'error');
-      return;
+      if(connectBtn && !silent){
+        connectBtn.textContent = oldConnectText || 'Connect Backend';
+        connectBtn.disabled = false;
+        connectBtn.style.opacity = 1;
+      }
+      if(!silent) toast(`Delta ${modeLabel} backend connect failed: ${e?.name === 'AbortError' ? 'timeout' : (e?.message || 'error')}`, 'error');
+      return false;
     }
   }
 
@@ -3337,23 +3521,32 @@ async function deltaConnect(){
     await deltaRequest('GET', '/v2/profile');
     DELTA.connected = true;
     deltaSyncUI();
-    toast(`Delta ${modeLabel} connected`, 'success');
+    if(connectBtn && !silent){
+      connectBtn.textContent = 'Connected';
+      connectBtn.disabled = false;
+      connectBtn.style.opacity = 1;
+    }
+    if(!silent) toast(`Delta ${modeLabel} connected`, 'success');
+    return true;
   }catch(e){
     DELTA.connected = false;
     deltaSyncUI();
-    toast(`Delta ${modeLabel} connect failed (CORS? add proxy/back-end URL)`, 'error');
+    if(connectBtn && !silent){
+      connectBtn.textContent = oldConnectText || 'Connect Backend';
+      connectBtn.disabled = false;
+      connectBtn.style.opacity = 1;
+    }
+    if(!silent) toast(`Delta ${modeLabel} connect failed (CORS? add proxy/back-end URL)`, 'error');
+    return false;
   }
 }
 
 function toggleDeltaLive(){
-  if(!DELTA.connected){
-    toast('Connect Delta first', 'error');
-    return;
-  }
-  DELTA.live = !DELTA.live;
+  const st = getState();
+  DELTA.live = !!st?.botEnabled;
   deltaSave();
   deltaSyncUI();
-  toast(DELTA.live ? `Bot -> Delta ON (${deltaModeLabel(DELTA.mode)})` : 'Bot -> Delta OFF', 'info');
+  toast(DELTA.live ? 'Delta trading follows START BOT' : 'Start bot to enable Delta trading', 'info');
 }
 
 function toggleDeltaBracket(){
@@ -3429,6 +3622,7 @@ async function deltaPriceGuardOK(trade, mode, productId, side){
 
 async function deltaPlaceOrder(trade, opts={}){
   if(!DELTA.live) return;
+  if(!DELTA.connected) await deltaConnect({ silent:true, auto:true });
   if(!DELTA.connected) return;
   const mode = deltaNormalizeMode(DELTA.mode);
   const modeLabel = deltaModeLabel(mode);
@@ -4221,6 +4415,148 @@ async function runBot(){
 /*********************
  * Price lines
  *********************/
+function markerSma(arr, n){
+  if(arr.length < n) return null;
+  let s = 0;
+  for(let i=arr.length-n;i<arr.length;i++) s += Number(arr[i] || 0);
+  return s / n;
+}
+function markerEma(arr, n){
+  if(arr.length < n) return null;
+  const k = 2 / (n + 1);
+  let e = markerSma(arr.slice(0, n), n);
+  for(let i=n;i<arr.length;i++) e = Number(arr[i]) * k + e * (1 - k);
+  return e;
+}
+function markerAtr(candles, p=14){
+  if(candles.length < p + 1) return 0;
+  let s = 0;
+  for(let i=candles.length-p;i<candles.length;i++){
+    const c = candles[i], prev = candles[i-1];
+    s += Math.max(c.high-c.low, Math.abs(c.high-prev.close), Math.abs(c.low-prev.close));
+  }
+  return s / p;
+}
+function markerAdx(candles, period=14){
+  if(candles.length < period + 2) return {adx:0, diPlus:0, diMinus:0};
+  const trs=[], plusDM=[], minusDM=[];
+  for(let i=1;i<candles.length;i++){
+    const c=candles[i], p=candles[i-1];
+    const upMove=c.high-p.high;
+    const downMove=p.low-c.low;
+    plusDM.push((upMove>downMove && upMove>0)?upMove:0);
+    minusDM.push((downMove>upMove && downMove>0)?downMove:0);
+    trs.push(Math.max(c.high-c.low, Math.abs(c.high-p.close), Math.abs(c.low-p.close)));
+  }
+  const sumLast = arr => arr.slice(-period).reduce((a,b)=>a+b,0);
+  const trN=sumLast(trs), pN=sumLast(plusDM), mN=sumLast(minusDM);
+  const diP = trN>0 ? 100*(pN/trN) : 0;
+  const diM = trN>0 ? 100*(mN/trN) : 0;
+  const dxs=[];
+  for(let i=period;i<trs.length;i++){
+    const tr=trs.slice(i-period,i).reduce((a,b)=>a+b,0);
+    const pp=plusDM.slice(i-period,i).reduce((a,b)=>a+b,0);
+    const mm=minusDM.slice(i-period,i).reduce((a,b)=>a+b,0);
+    const dip = tr>0 ? 100*(pp/tr) : 0;
+    const dim = tr>0 ? 100*(mm/tr) : 0;
+    dxs.push((dip+dim)===0 ? 0 : 100*Math.abs(dip-dim)/(dip+dim));
+  }
+  return {adx: dxs.length ? dxs.slice(-period).reduce((a,b)=>a+b,0)/Math.min(period,dxs.length) : 0, diPlus:diP, diMinus:diM};
+}
+function markerComputeSignals(candles){
+  const closes = candles.map(c=>Number(c.close));
+  const price = closes[closes.length-1];
+  const ma7 = markerSma(closes,7)||price;
+  const ma25 = markerSma(closes,25)||price;
+  const ma99 = markerSma(closes,99)||price;
+  const ema12v = markerEma(closes,12)||price;
+  const ema26v = markerEma(closes,26)||price;
+  const ema50v = markerEma(closes,50)||price;
+  const ema200v = markerEma(closes,200)||price;
+  let buy=0, sell=0;
+  buy += price>ma7?15:0; sell += price<ma7?15:0;
+  buy += price>ma25?15:0; sell += price<ma25?15:0;
+  buy += price>ma99?15:0; sell += price<ma99?15:0;
+  buy += ma7>ma25?20:0; sell += ma7<ma25?20:0;
+  buy += ma25>ma99?15:0; sell += ma25<ma99?15:0;
+  buy += price>ema12v?10:0; sell += price<ema12v?10:0;
+  buy += ema12v>ema26v?15:0; sell += ema12v<ema26v?15:0;
+  const macd = ema12v - ema26v;
+  buy += macd>0?50:0; sell += macd<0?50:0;
+  const mom = closes.length>=6 ? (price-closes[closes.length-6])/Math.max(1e-9,closes[closes.length-6])*100 : 0;
+  buy += mom>0.2?25:0; sell += mom<-0.2?25:0;
+  buy += price>ma7 && price>ma25 && mom>0?30:0;
+  sell += price<ma7 && price<ma25 && mom<0?30:0;
+  const atrV = markerAtr(candles,14);
+  const d = markerAdx(candles,14);
+  let regime = 'SIDEWAYS';
+  if(d.adx > 18 && price > ema200v && ema50v > ema200v) regime = 'BULL';
+  if(d.adx > 18 && price < ema200v && ema50v < ema200v) regime = 'BEAR';
+  return {buy, sell, price, atr:atrV, adx:d.adx, regime};
+}
+function markerRegime(sig, strict=false){
+  const adxMin = strict ? 18 : 12;
+  if(!sig || Number(sig.adx||0) <= adxMin) return {regime:'SIDEWAYS', ok:true, side:null, soft:true};
+  if(sig.regime === 'BULL') return {regime:'BULL', ok:true, side:'LONG', soft:false};
+  if(sig.regime === 'BEAR') return {regime:'BEAR', ok:true, side:'SHORT', soft:false};
+  return {regime:'SIDEWAYS', ok:true, side:null, soft:true};
+}
+function markerPriceAction(candles, sig, regime){
+  if(!Array.isArray(candles) || candles.length < 24 || !sig) return null;
+  const last = candles[candles.length-1];
+  const prev = candles[candles.length-2];
+  const recent = candles.slice(-13, -1);
+  const swingHigh = Math.max(...recent.map(c=>Number(c.high||0)));
+  const swingLow = Math.min(...recent.map(c=>Number(c.low||0)));
+  const avgVol = candles.slice(-20).reduce((a,c)=>a+Number(c.volume||0),0) / Math.min(20, candles.length);
+  const volBoost = avgVol > 0 ? Number(last.volume||0) / avgVol : 0;
+  const range = Math.max(1e-9, Number(last.high||0) - Number(last.low||0));
+  const bodyPower = Math.abs(Number(last.close||0)-Number(last.open||0)) / range;
+  if(Number(sig.adx||0) < 16 || volBoost < 1.1 || bodyPower < 0.55) return null;
+  const upBreak = Number(last.close||0) > swingHigh && Number(last.close||0) > Number(prev.high||0);
+  const dnBreak = Number(last.close||0) < swingLow && Number(last.close||0) < Number(prev.low||0);
+  const side = upBreak ? 'LONG' : (dnBreak ? 'SHORT' : null);
+  if(!side) return null;
+  if(regime?.ok && !regime.soft && regime.side && regime.side !== side) return null;
+  const quality = Math.round(Math.min(99, Math.max(50, 58 + Number(sig.adx||0) + (volBoost*10) + (bodyPower*12))));
+  return {side, quality};
+}
+function buildHistoricalSignalMarkers(st, tf){
+  const candles = st?.candlesByTf?.[tf] || [];
+  if(candles.length < 80) return [];
+  const c30 = st?.candlesByTf?.['30m'] || [];
+  const start = Math.max(60, candles.length - 1200);
+  const out = [];
+  let lastSide = '', lastTime = 0;
+  const sec = TF_SEC[tf] || TF_SEC[DEFAULT_TF];
+  for(let i=start;i<candles.length;i++){
+    const slice = candles.slice(Math.max(0, i-260), i+1);
+    const sig = markerComputeSignals(slice);
+    let regimeSig = sig;
+    if(tf === '15m' && c30.length >= 60){
+      const upTo = c30.filter(c => Number(c.time) <= Number(candles[i].time));
+      if(upTo.length >= 60) regimeSig = markerComputeSignals(upTo.slice(-260));
+    }
+    const regime = markerRegime(regimeSig, !!st.strictMode);
+    const pa = markerPriceAction(slice, sig, regime);
+    if(!pa || pa.quality < 75) continue;
+    const diff = Math.abs(Number(sig.buy||0) - Number(sig.sell||0));
+    const trendOk = pa.side === 'LONG' ? Number(sig.buy||0) >= Number(sig.sell||0) : Number(sig.sell||0) >= Number(sig.buy||0);
+    if(!trendOk || diff < 20) continue;
+    if(pa.side === lastSide && (Number(candles[i].time) - lastTime) < sec * 3) continue;
+    lastSide = pa.side;
+    lastTime = Number(candles[i].time);
+    out.push({
+      time: Number(candles[i].time),
+      position: pa.side === 'LONG' ? 'belowBar' : 'aboveBar',
+      color: pa.side === 'LONG' ? '#22c55e' : '#ef4444',
+      shape: pa.side === 'LONG' ? 'arrowUp' : 'arrowDown',
+      text: `${pa.side === 'LONG' ? 'BUY' : 'SELL'} ${tf}`,
+    });
+  }
+  return out.slice(-220);
+}
+
 function refreshChartLines(){
   const st = getState();
   if(!st || !cs) return;
@@ -4242,7 +4578,8 @@ function refreshTradeMarkers(){
   const candles = st.candlesByTf?.[tf] || [];
   const knownTimes = new Set(candles.map(c=>Number(c.time)));
   const lastTime = candles.length ? Number(candles[candles.length-1].time) : null;
-  const markers = st.trades.map(trade => {
+  const signalMarkers = buildHistoricalSignalMarkers(st, tf);
+  const tradeMarkers = st.trades.map(trade => {
     let time = Math.floor((Number(trade.entryTime || Date.now()) / 1000) / sec) * sec;
     if(!knownTimes.has(time) && Number.isFinite(lastTime)) time = lastTime;
     return {
@@ -4253,6 +4590,7 @@ function refreshTradeMarkers(){
       text: `${trade.side} ${trade.tf}`,
     };
   }).filter(marker => Number.isFinite(marker.time));
+  const markers = [...signalMarkers, ...tradeMarkers].sort((a,b)=>Number(a.time)-Number(b.time));
   cs.setMarkers(markers);
 }
 
@@ -4923,6 +5261,7 @@ async function pullDeltaCandles(sym, opts={}){
         cs.update(last);
       }
       updateMAs(merged);
+      refreshTradeMarkers();
     }
 
     maybeComputeTf(sym, tf, !fast);
@@ -5063,6 +5402,7 @@ function resetBalance(){
 loadAll();
 deltaLoad();
 deltaLoadBackendCreds(deltaNormalizeMode(DELTA.mode), { silent:true });
+deltaQueueAutoConnect(900);
 authBootstrap();
 startPriceFeed();
 
