@@ -309,8 +309,14 @@ def cache_put(cache: dict[str, dict[str, Any]], key: str, value: Any) -> Any:
     return value
 
 
-def actor_key(mode: str, key: str) -> str:
-    digest = hashlib.sha256(f"{normalize_mode(mode)}:{key}".encode("utf-8")).hexdigest()
+def normalize_profile_name(name: Any) -> str:
+    raw = " ".join(str(name or "").split()).strip()
+    return raw[:64]
+
+
+def actor_key(mode: str, key: str, profile_name: str = "") -> str:
+    profile = normalize_profile_name(profile_name).lower()
+    digest = hashlib.sha256(f"{normalize_mode(mode)}:{profile}:{key}".encode("utf-8")).hexdigest()
     return digest[:24]
 
 
@@ -1617,6 +1623,154 @@ def execution_signal(candles15: list[dict], want_side: str) -> dict:
         return {"ok": False, "why": "15m no confirmation"}
     return {"ok": True}
 
+def bot_ut_bot_signal(candles: list[dict], key_value: float = 1.0, atr_period: int = 10) -> dict[str, Any]:
+    period = max(1, int(atr_period or 10))
+    mult = max(0.1, float(key_value or 1.0))
+    if len(candles) < period + 3:
+        return {
+            "ok": False,
+            "signal": "WAIT",
+            "side": None,
+            "bias": None,
+            "trailing_stop": None,
+            "atr": 0.0,
+            "price": 0.0,
+            "quality": 0,
+            "why": "UT warmup",
+        }
+
+    trs: list[float] = []
+    for i, candle in enumerate(candles):
+        high = to_float(candle.get("high"), 0.0)
+        low = to_float(candle.get("low"), 0.0)
+        prev_close = to_float((candles[i - 1] if i > 0 else candle).get("close"), 0.0)
+        trs.append(max(high - low, abs(high - prev_close), abs(low - prev_close)))
+
+    trailing_stop = 0.0
+    last_atr = 0.0
+    latest_signal = "WAIT"
+    latest_side: str | None = None
+    bias: str | None = None
+
+    for i, candle in enumerate(candles):
+        src = to_float(candle.get("close"), 0.0)
+        atr_window = trs[max(0, i - period + 1):i + 1]
+        atr_now = sum(atr_window) / max(1, len(atr_window))
+        n_loss = mult * atr_now
+        prev_stop = trailing_stop if i > 0 else 0.0
+        prev_src = to_float((candles[i - 1] if i > 0 else candle).get("close"), src)
+
+        if i == 0:
+            trailing_stop = src - n_loss
+        elif src > prev_stop and prev_src > prev_stop:
+            trailing_stop = max(prev_stop, src - n_loss)
+        elif src < prev_stop and prev_src < prev_stop:
+            trailing_stop = min(prev_stop, src + n_loss)
+        elif src > prev_stop:
+            trailing_stop = src - n_loss
+        else:
+            trailing_stop = src + n_loss
+
+        buy = i > 0 and src > trailing_stop and prev_src <= prev_stop
+        sell = i > 0 and src < trailing_stop and prev_src >= prev_stop
+        if i == len(candles) - 1:
+            latest_signal = "BUY" if buy else ("SELL" if sell else "WAIT")
+            latest_side = "LONG" if buy else ("SHORT" if sell else None)
+        last_atr = atr_now
+        bias = "LONG" if src >= trailing_stop else "SHORT"
+
+    price = to_float(candles[-1].get("close"), 0.0)
+    dist_atr = abs(price - trailing_stop) / last_atr if last_atr > 0 else 0.0
+    quality_floor = 78.0 if latest_side else 58.0
+    quality = round(min(99.0, max(quality_floor, 68.0 + dist_atr * 12.0)))
+    return {
+        "ok": True,
+        "signal": latest_signal,
+        "side": latest_side,
+        "bias": bias,
+        "trailing_stop": trailing_stop,
+        "atr": last_atr,
+        "price": price,
+        "quality": quality,
+        "why": f"UT {latest_signal}" if latest_side else f"UT bias {bias or '--'}",
+    }
+
+def bot_nn_entry_signal(candles_15: list[dict], sig15: dict, sig30: dict, strict: bool = False) -> dict[str, Any]:
+    regime = determine_regime(sig30, strict)
+    if not regime.get("ok"):
+        return {"ok": False, "why": "Regime not ready", "regime": regime}
+    filters = no_trade_filters(candles_15, sig15, strict)
+    if not filters.get("ok"):
+        return {"ok": False, "why": f"Filter: {filters.get('why')}", "regime": regime, "filters": filters}
+    nn15 = nn_predict(candles_15)
+    setup = setup_signal(nn15, strict)
+    if not setup.get("ok"):
+        return {"ok": False, "why": setup.get("why", "NN15 missing"), "regime": regime, "filters": filters}
+    want_side = str(setup.get("dir") or "")
+    if not regime.get("soft") and regime.get("side") and want_side != regime.get("side"):
+        return {"ok": False, "why": "NN15 not aligned with 30m regime", "regime": regime, "filters": filters}
+    if regime.get("soft") and to_float(setup.get("conf"), 0.0) < 60:
+        return {"ok": False, "why": "Sideways: need NN15 >=60%", "regime": regime, "filters": filters}
+    trigger = trigger_signal(sig15, want_side, strict)
+    if not trigger.get("ok"):
+        return {"ok": False, "why": trigger.get("why", "Weak diff"), "regime": regime, "filters": filters}
+    exec_sig = execution_signal(candles_15, want_side)
+    if not exec_sig.get("ok"):
+        return {"ok": False, "why": exec_sig.get("why", "15m no confirmation"), "regime": regime, "filters": filters}
+    diff = abs(to_float(sig15.get("buy"), 0.0) - to_float(sig15.get("sell"), 0.0))
+    adx = to_float(sig30.get("adx"), 0.0)
+    conf = to_float(setup.get("conf"), 50.0)
+    quality = round(min(99.0, max(50.0, conf + min(18.0, diff / 2.0) + min(12.0, adx / 3.0))))
+    return {
+        "ok": True,
+        "side": want_side,
+        "quality": quality,
+        "strategy": "AI Neural (Pro)",
+        "why": "NN confirmed",
+        "regime": regime,
+    }
+
+def bot_price_action_entry_signal(candles_15: list[dict], sig15: dict, sig30: dict, strict: bool = False) -> dict[str, Any]:
+    regime = determine_regime(sig30, strict)
+    if not regime.get("ok"):
+        return {"ok": False, "why": "Regime not ready", "regime": regime}
+    pa = bot_price_action_signal(candles_15, sig15, regime)
+    if not pa.get("ok"):
+        return {"ok": False, "why": pa.get("why", "PA waiting"), "regime": regime}
+    return {
+        "ok": True,
+        "side": str(pa.get("side") or ""),
+        "quality": round(to_float(pa.get("quality"), 0.0)),
+        "strategy": "Price Action (Breakout)",
+        "why": pa.get("why", "PA breakout"),
+        "regime": regime,
+    }
+
+def bot_active_entry_strategy(state: dict[str, Any]) -> str:
+    chosen = str(state.get("entry_strategy") or "").strip()
+    if chosen in {"nn", "priceAction", "utBot"}:
+        return chosen
+    active: list[str] = []
+    if bool(state.get("strategy_nn", False)):
+        active.append("nn")
+    if bool(state.get("strategy_pa", False)):
+        active.append("priceAction")
+    if bool(state.get("strategy_ut", False)):
+        active.append("utBot")
+    if len(active) == 1:
+        return active[0]
+    if "priceAction" in active:
+        return "priceAction"
+    if active:
+        return active[0]
+    return ""
+
+def bot_news_allows(side: str, news: dict[str, Any]) -> bool:
+    bias = str(news.get("bias") or "neutral").lower()
+    score = abs(to_float(news.get("score"), 0.0))
+    aligned = (side == "LONG" and bias == "bullish") or (side == "SHORT" and bias == "bearish")
+    return aligned and score >= 12.0
+
 
 # â”€â”€ SL/TP (mirrors JS slTpAdvanced) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -1873,9 +2027,13 @@ def bot_run_symbol(state: dict, symbol: str) -> None:
     bot_enabled: bool = bool(state.get("bot_enabled", False))
     live_trading: bool = bool(state.get("live_trading", False))
     strict: bool = bool(state.get("strict_mode", False))
-    strategy_nn: bool = bool(state.get("strategy_nn", False))
-    strategy_pa: bool = bool(state.get("strategy_pa", True))
-    strategy_news: bool = bool(state.get("strategy_news", True))
+    strategy_news: bool = bool(state.get("strategy_news", False))
+    entry_strategy: str = bot_active_entry_strategy(state)
+    if not entry_strategy:
+        return
+    trade_tf: str = str(state.get("trade_tf") or "15m")
+    if trade_tf not in TF_SEC:
+        trade_tf = "15m"
     min_entry_gap_sec: int = max(60, int(state.get("min_entry_gap_sec", 1800)))
 
     pid_raw = product_map.get(symbol, "")
@@ -1921,19 +2079,39 @@ def bot_run_symbol(state: dict, symbol: str) -> None:
                 exc_side = "buy" if active.get("side") == "LONG" else "sell"
                 bot_close_trade_on_exchange(key, secret, mode, product_id, exc_side, lot)
 
-            active["closed"] = True
-            active["exit"] = price
-            active["exit_time"] = utc_now()
-            active["reason"] = reason
-            active["pnl_usd"] = round(net_pnl, 4)
-            active["fee_paid"] = round(fee, 4)
+            closed_trade = {
+                **active,
+                "closed": True,
+                "exit": price,
+                "exit_time": utc_now(),
+                "reason": reason,
+                "pnl_usd": round(net_pnl, 4),
+                "fee_paid": round(fee, 4),
+            }
+            history = state.setdefault("history", [])
+            history.insert(0, closed_trade)
+            del history[250:]
 
             current_balance = float(state.get("demo_balance", 1000.0))
             state["demo_balance"] = max(0.0, current_balance + net_pnl)
 
-            record_trade_event(reason, mode, product_id, side=active.get("side"), symbol=symbol, pnl_usd=round(net_pnl, 4))
+            record_trade_event(
+                reason,
+                mode,
+                product_id,
+                side=active.get("side"),
+                symbol=symbol,
+                entry=entry_p,
+                exit=price,
+                entry_time=active.get("entry_time"),
+                exit_time=closed_trade.get("exit_time"),
+                strategy=active.get("strategy"),
+                tf=active.get("tf"),
+                pnl_usd=round(net_pnl, 4),
+            )
             add_log("bot_close", symbol=symbol, reason=reason, price=price, pnl=round(net_pnl, 4))
             state["last_close_time"] = time.time()
+            active["closed"] = True
             trades[:] = [t for t in trades if not t.get("closed")]
             return
 
@@ -1945,34 +2123,49 @@ def bot_run_symbol(state: dict, symbol: str) -> None:
         return
     if not bot_can_open_today(state):
         return
-    last_entry_time = float(state.get(f"last_entry_time_{symbol}", 0.0))
+    last_entry_time = float(state.get(f"last_entry_time_{symbol}_{trade_tf}", 0.0))
     if (time.time() - last_entry_time) < min_entry_gap_sec:
         return
 
-    candles_15 = bot_fetch_candles(mode, symbol, "15m", 120)
-    candles_30 = bot_fetch_candles(mode, symbol, "30m", 120)
-    if len(candles_15) < 60 or len(candles_30) < 60:
+    candles_trade = bot_fetch_candles(mode, symbol, trade_tf, 120)
+    candles_30 = candles_trade if trade_tf == "30m" else bot_fetch_candles(mode, symbol, "30m", 120)
+    if len(candles_trade) < 60 or len(candles_30) < 60:
         return
 
-    last_closed_15 = get_last_closed_candle(candles_15, "15m")
-    last_entry_candle = int(state.get(f"last_entry_candle_{symbol}", 0))
-    if last_closed_15 == 0 or last_closed_15 == last_entry_candle:
+    last_closed_trade = get_last_closed_candle(candles_trade, trade_tf)
+    last_entry_candle = int(state.get(f"last_entry_candle_{symbol}_{trade_tf}", 0))
+    if last_closed_trade == 0 or last_closed_trade == last_entry_candle:
         return
 
-    sig15 = compute_signals(candles_15)
+    sig15 = compute_signals(candles_trade)
     sig30 = compute_signals(candles_30)
-    regime = determine_regime(sig30, strict)
-    pa = bot_price_action_signal(candles_15, sig15, regime)
     news = fetch_news_sentiment(symbol) if strategy_news else {"bias": "neutral", "score": 0}
-    combined = bot_combined_signal(sig15, sig30, regime, pa if strategy_pa else {}, news)
-    if not combined.get("ok"):
-        return
-    side = str(combined.get("side"))
-    strategy = str(combined.get("strategy") or "Combined PA + News")
-    if str(combined.get("why") or "").startswith("strong"):
+
+    if entry_strategy == "utBot":
+        selected = bot_ut_bot_signal(candles_trade)
+        if not selected.get("ok") or not selected.get("side"):
+            return
+        side = str(selected.get("side") or "")
+        strategy = "UT Bot Alerts"
+        exc = {"ok": True}
+    elif entry_strategy == "nn":
+        selected = bot_nn_entry_signal(candles_trade, sig15, sig30, strict)
+        if not selected.get("ok") or to_float(selected.get("quality"), 0.0) < 75:
+            return
+        side = str(selected.get("side") or "")
+        strategy = str(selected.get("strategy") or "AI Neural (Pro)")
         exc = {"ok": True}
     else:
-        exc = execution_signal(candles_15, side)
+        selected = bot_price_action_entry_signal(candles_trade, sig15, sig30, strict)
+        if not selected.get("ok") or to_float(selected.get("quality"), 0.0) < 75:
+            return
+        side = str(selected.get("side") or "")
+        strategy = str(selected.get("strategy") or "Price Action (Breakout)")
+        exc = execution_signal(candles_trade, side)
+    if side not in {"LONG", "SHORT"}:
+        return
+    if strategy_news and not bot_news_allows(side, news):
+        return
     if not exc.get("ok"):
         return
 
@@ -1980,7 +2173,7 @@ def bot_run_symbol(state: dict, symbol: str) -> None:
         return
 
     entry = price
-    sl, tp = bot_sl_tp(symbol, side, entry, sl_points, tp_points, tf="15m", atr=sig15.get("atr", 0), adx=sig15.get("adx", 0))
+    sl, tp = bot_sl_tp(symbol, side, entry, sl_points, tp_points, tf=trade_tf, atr=sig15.get("atr", 0), adx=sig15.get("adx", 0))
 
     if live_trading:
         exc_side = "buy" if side == "LONG" else "sell"
@@ -1998,16 +2191,19 @@ def bot_run_symbol(state: dict, symbol: str) -> None:
         "tp": tp,
         "lot": lot,
         "qty": qty,
+        "qtyBase": qty,
         "entry_time": utc_now(),
+        "entry_time_ms": int(time.time() * 1000),
+        "entry_candle_time": last_closed_trade,
         "closed": False,
         "strategy": strategy,
-        "tf": "15m",
+        "tf": trade_tf,
     }
     trades.append(new_trade)
     bot_mark_open_today(state)
     state["last_trade_time"] = time.time()
-    state[f"last_entry_time_{symbol}"] = time.time()
-    state[f"last_entry_candle_{symbol}"] = last_closed_15
+    state[f"last_entry_time_{symbol}_{trade_tf}"] = time.time()
+    state[f"last_entry_candle_{symbol}_{trade_tf}"] = last_closed_trade
     add_log("bot_open", symbol=symbol, side=side, entry=entry, sl=sl, tp=tp, strategy=strategy)
 
 
@@ -2050,6 +2246,7 @@ def _patched_do_GET(self: Handler) -> None:
                 actors.append({
                     "actor": actor_id,
                     "mode": state.get("mode"),
+                    "profile_name": state.get("profile_name", ""),
                     "bot_enabled": state.get("bot_enabled", False),
                     "live_trading": state.get("live_trading", False),
                     "symbols": state.get("symbols", SYMBOLS),
@@ -2079,6 +2276,7 @@ def _patched_do_POST(self: Handler) -> None:
         key = str(body.get("key") or "").strip()
         secret = str(body.get("secret") or "").strip()
         mode = normalize_mode(str(body.get("mode") or "live"))
+        profile_name = normalize_profile_name(body.get("profile_name") or "")
         if not key or not secret:
             saved_key, saved_secret = get_saved_creds(mode)
             key = key or saved_key
@@ -2087,18 +2285,20 @@ def _patched_do_POST(self: Handler) -> None:
             self._json(400, {"ok": False, "error": "Missing key/secret"})
             return
         save_creds(mode, key, secret)
-        ak = actor_key(mode, key)
+        ak = actor_key(mode, key, profile_name)
 
         with BOT_STATE_LOCK:
             existing = BOT_STATE.get(ak, {})
             # Merge incoming state with existing (preserve open trades)
             existing_trades = existing.get("trades", [])
+            existing_history = existing.get("history", [])
 
             BOT_STATE[ak] = {
                 **existing,
                 "key": key,
                 "secret": secret,
                 "mode": mode,
+                "profile_name": profile_name,
                 "active": True,
                 # Preserve bot_enabled if app does not explicitly send it (keeps bot running after app closes)
                 "bot_enabled": bool(body["bot_enabled"]) if "bot_enabled" in body else existing.get("bot_enabled", False),
@@ -2107,9 +2307,13 @@ def _patched_do_POST(self: Handler) -> None:
                 "lot": max(1, int(body.get("lot", 1))),
                 "sl_points": float(body.get("sl_points", 0)),
                 "tp_points": float(body.get("tp_points", 0)),
+                "trade_tf": str(body.get("trade_tf") or existing.get("trade_tf") or "15m"),
+                "strict_mode": bool(body["strict_mode"]) if "strict_mode" in body else existing.get("strict_mode", False),
+                "entry_strategy": str(body.get("entry_strategy") or existing.get("entry_strategy") or ""),
                 "strategy_nn": bool(body["strategy_nn"]) if "strategy_nn" in body else existing.get("strategy_nn", False),
-                "strategy_pa": bool(body["strategy_pa"]) if "strategy_pa" in body else existing.get("strategy_pa", True),
-                "strategy_news": bool(body["strategy_news"]) if "strategy_news" in body else existing.get("strategy_news", True),
+                "strategy_pa": bool(body["strategy_pa"]) if "strategy_pa" in body else existing.get("strategy_pa", False),
+                "strategy_ut": bool(body["strategy_ut"]) if "strategy_ut" in body else existing.get("strategy_ut", False),
+                "strategy_news": bool(body["strategy_news"]) if "strategy_news" in body else existing.get("strategy_news", False),
                 "daily_trade_limit": max(1, min(10, int(body.get("daily_trade_limit", existing.get("daily_trade_limit", 10))))),
                 "min_entry_gap_sec": max(60, int(body.get("min_entry_gap_sec", existing.get("min_entry_gap_sec", 1800)))),
                 "daily_trade_counter": existing.get("daily_trade_counter", {"day": "", "count": 0}),
@@ -2117,6 +2321,7 @@ def _patched_do_POST(self: Handler) -> None:
                 "demo_balance": float(body.get("demo_balance") or
                                       existing.get("demo_balance", 1000.0)),
                 "trades": existing_trades,  # keep backend's own trade list
+                "history": existing_history,
                 "last_heartbeat": time.time(),
             }
             current_state = BOT_STATE[ak]
@@ -2126,10 +2331,12 @@ def _patched_do_POST(self: Handler) -> None:
         self._json(200, {
             "ok": True,
             "mode": mode,
+            "profile_name": current_state.get("profile_name", ""),
             "bot_enabled": current_state["bot_enabled"],
             "live_trading": current_state["live_trading"],
             "demo_balance": current_state.get("demo_balance", 1000.0),
             "trades": open_trades,
+            "history": list(current_state.get("history", [])[:150]),
             "ts": utc_now(),
         })
         return
@@ -2143,6 +2350,7 @@ def _patched_do_POST(self: Handler) -> None:
         key = str(body.get("key") or "").strip()
         secret = str(body.get("secret") or "").strip()
         mode = normalize_mode(str(body.get("mode") or "live"))
+        profile_name = normalize_profile_name(body.get("profile_name") or "")
         if not key or not secret:
             saved_key, saved_secret = get_saved_creds(mode)
             key = key or saved_key
@@ -2150,7 +2358,7 @@ def _patched_do_POST(self: Handler) -> None:
         if not key:
             self._json(400, {"ok": False, "error": "Missing key"})
             return
-        ak = actor_key(mode, key)
+        ak = actor_key(mode, key, profile_name)
         with BOT_STATE_LOCK:
             if ak in BOT_STATE:
                 BOT_STATE[ak]["active"] = False
