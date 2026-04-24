@@ -105,6 +105,72 @@
     .strategy-card.active{border-color:rgba(99,102,241,.8); box-shadow:0 0 0 1px rgba(99,102,241,.35) inset;}
     .strategy-badge{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; font-size:10px; font-weight:800;}
     .desktop-grid-2{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;}
+    .mode-grid{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px;}
+    .mode-card{position:relative; overflow:hidden; border-radius:24px; padding:20px; border:1px solid rgba(99,102,241,.28); background:linear-gradient(180deg,rgba(18,18,31,.92),rgba(10,10,21,.96)); text-align:left; transition:transform .2s ease, border-color .2s ease, box-shadow .2s ease;}
+    .mode-card:hover{transform:translateY(-2px); border-color:rgba(168,85,247,.55); box-shadow:0 16px 40px rgba(0,0,0,.28);}
+    .mode-preview{margin-top:18px; border-radius:20px; border:1px solid rgba(99,102,241,.22); background:linear-gradient(180deg,rgba(31,31,58,.85),rgba(12,12,24,.95)); padding:12px;}
+    .mode-tag{display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; font-size:10px; font-weight:900; letter-spacing:.12em; text-transform:uppercase;}
+    body.ui-phone{background:
+      radial-gradient(circle at top, rgba(99,102,241,.18), transparent 36%),
+      linear-gradient(180deg,#080813 0%,#0a0a15 100%);
+    }
+    body.ui-phone #viewSelect > div,
+    body.ui-phone #coinSelect > div,
+    body.ui-phone #app{
+      width:min(100%, 430px);
+      max-width:430px;
+      margin-inline:auto;
+    }
+    body.ui-phone #app{
+      min-height:100dvh;
+      box-shadow:0 0 0 1px rgba(99,102,241,.22), 0 24px 70px rgba(0,0,0,.42);
+    }
+    body.ui-phone #workspaceShell{display:block; overflow:visible;}
+    body.ui-phone main,
+    body.ui-phone header,
+    body.ui-phone section,
+    body.ui-phone .chartControls,
+    body.ui-phone .tf-scroll{min-width:0;}
+    body.ui-phone #tab_chart > div:first-child{flex-wrap:wrap; row-gap:8px;}
+    body.ui-phone #tab_chart > div:first-child .chartControls{flex-wrap:wrap; width:100%; justify-content:flex-start;}
+    body.ui-phone #tab_chart > div:first-child .tf-scroll{max-width:100%; width:100%; flex:1 1 100%;}
+    body.ui-phone #chart{min-height:300px;}
+    body.ui-phone .desktop-grid-2,
+    body.ui-phone #side .grid.grid-cols-2{grid-template-columns:1fr;}
+    body.ui-phone .sm\:grid-cols-2,
+    body.ui-phone .sm\:grid-cols-3,
+    body.ui-phone .sm\:grid-cols-4,
+    body.ui-phone .lg\:grid-cols-4{grid-template-columns:1fr !important;}
+    body.ui-phone header > div{align-items:flex-start;}
+    body.ui-phone header > div > div:last-child{flex-wrap:wrap; justify-content:flex-end;}
+    body.ui-phone .menuBtn{display:inline-flex !important;}
+    body.ui-phone .overlay{display:none !important; position:fixed; inset:0; z-index:650; background:rgba(0,0,0,.65); backdrop-filter: blur(2px);}
+    body.ui-phone .overlay.open{display:block !important;}
+    body.ui-phone .side{
+      position:fixed;
+      top:0;
+      right:-100%;
+      bottom:0;
+      width:min(414px, calc(100vw - 12px));
+      z-index:700;
+      transition:right .25s ease;
+      box-shadow:-10px 0 30px rgba(0,0,0,.55);
+    }
+    body.ui-phone .side.open{right:0;}
+    body.ui-phone .mobilebar{
+      display:flex;
+      left:50%;
+      right:auto;
+      transform:translateX(-50%);
+      width:min(calc(100vw - 16px), 414px);
+      border-radius:18px 18px 0 0;
+      padding-bottom:calc(10px + env(safe-area-inset-bottom));
+    }
+    body.ui-phone .mainpad{padding-bottom:calc(86px + env(safe-area-inset-bottom));}
+    body.ui-phone #analyticsTabBtn{display:none !important;}
+    @media (max-width:768px){
+      .mode-grid{grid-template-columns:1fr;}
+    }
   </style>
   <script>
 const BACKEND = "https://kapil12312313-delta-backend.hf.space";
@@ -141,6 +207,86 @@ console.log("✅ Backend Connected:", BACKEND);
     </div>
   </div>
 
+  <!-- UI mode select -->
+  <div id="viewSelect" class="hidden min-h-[100dvh] p-5">
+    <div class="max-w-3xl mx-auto min-h-[calc(100dvh-40px)] flex items-center">
+      <div class="w-full glass rounded-[28px] p-5 sm:p-8 border">
+        <div class="mode-tag" style="background:rgba(168,85,247,.15); color:var(--p)">UI Selector</div>
+        <div class="mt-4 text-3xl sm:text-5xl font-black leading-tight">Choose how you want this dashboard to open.</div>
+        <div class="mt-3 text-sm sm:text-base" style="color:var(--mut)">PC UI current full dashboard kholega. Phone UI 6.5-inch screen fit ke hisab se compact layout use karega, jisme koi section screen ke bahar na nikle.</div>
+
+        <div class="mode-grid mt-6">
+          <button class="mode-card" onclick="chooseUiMode('pc')">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <div class="text-2xl font-black">PC UI</div>
+                <div class="mt-1 text-sm" style="color:var(--mut)">Current desktop-style workspace</div>
+              </div>
+              <div class="mode-tag" style="background:rgba(59,130,246,.15); color:var(--info)">Wide</div>
+            </div>
+            <div class="mode-preview">
+              <div class="h-3 rounded-full" style="background:rgba(99,102,241,.24)"></div>
+              <div class="mt-3 grid grid-cols-[1.5fr_.8fr] gap-3">
+                <div class="rounded-2xl h-32" style="background:linear-gradient(180deg,rgba(59,130,246,.18),rgba(59,130,246,.05))"></div>
+                <div class="rounded-2xl h-32" style="background:linear-gradient(180deg,rgba(168,85,247,.18),rgba(168,85,247,.05))"></div>
+              </div>
+            </div>
+          </button>
+
+          <button class="mode-card" onclick="chooseUiMode('phone')">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <div class="text-2xl font-black">Phone UI</div>
+                <div class="mt-1 text-sm" style="color:var(--mut)">6.5-inch screen fit, no overflow</div>
+              </div>
+              <div class="mode-tag" style="background:rgba(34,197,94,.15); color:var(--g)">Compact</div>
+            </div>
+            <div class="mode-preview mx-auto" style="width:min(100%, 220px)">
+              <div class="mx-auto rounded-[24px] p-3" style="border:1px solid rgba(99,102,241,.22); background:rgba(10,10,21,.85)">
+                <div class="h-2 rounded-full mx-auto w-14" style="background:rgba(107,114,128,.45)"></div>
+                <div class="mt-3 rounded-2xl h-24" style="background:linear-gradient(180deg,rgba(34,197,94,.18),rgba(34,197,94,.05))"></div>
+                <div class="mt-3 rounded-2xl h-16" style="background:linear-gradient(180deg,rgba(168,85,247,.16),rgba(168,85,247,.05))"></div>
+                <div class="mt-3 grid grid-cols-2 gap-2">
+                  <div class="rounded-xl h-10" style="background:rgba(31,31,58,.9)"></div>
+                  <div class="rounded-xl h-10" style="background:rgba(31,31,58,.9)"></div>
+                </div>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Profile gate -->
+  <div id="profileGate" class="hidden min-h-[100dvh] p-5">
+    <div class="max-w-3xl mx-auto">
+      <div class="glass rounded-3xl p-6 border">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <div class="text-2xl font-black">Open Your Profile</div>
+            <div class="text-sm mt-1" style="color:var(--mut)">Apna naam likho. Har naam ka trades, history, settings aur bot data alag save rahega.</div>
+          </div>
+          <div class="px-3 py-2 rounded-2xl text-xs font-black" style="background:rgba(34,197,94,.15); color:var(--g)">Data never deleted</div>
+        </div>
+
+        <div class="mt-5 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
+          <input id="profileNameInput" type="text" maxlength="40" placeholder="Jaise: Kapil" class="px-4 py-3 rounded-2xl text-base" style="background:var(--bg3); border:1px solid var(--b)" onkeydown="if(event.key==='Enter'){ continueWithProfile(); }" />
+          <button class="px-5 py-3 rounded-2xl font-black" style="background:linear-gradient(135deg,var(--acc),#8b5cf6)" onclick="continueWithProfile()">Continue</button>
+        </div>
+
+        <div class="mt-3 text-xs" style="color:var(--mut)">
+          Same name = same data wapas aayega. Naya name = naya separate profile khulega.
+        </div>
+
+        <div class="mt-5">
+          <div class="text-xs font-black uppercase tracking-[0.2em]" style="color:var(--mut)">Saved Profiles</div>
+          <div id="profileList" class="mt-3 flex flex-wrap gap-2"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Coin select -->
   <div id="coinSelect" class="hidden min-h-[100dvh] p-5">
     <div class="max-w-4xl mx-auto">
@@ -148,8 +294,13 @@ console.log("✅ Backend Connected:", BACKEND);
         <div>
           <div class="text-xl font-black">Select Market</div>
           <div class="text-sm" style="color:var(--mut)">BTC / ETH / SOL / Gold (PAXG)</div>
+          <div id="profileCoinLabel" class="text-xs mt-1" style="color:var(--acc)">Profile: --</div>
         </div>
-        <button id="installBtn" class="hidden px-3 py-2 rounded-lg font-bold" style="background:var(--acc)">Install</button>
+        <div class="flex items-center gap-2">
+          <button class="px-3 py-2 rounded-lg font-bold" style="background:rgba(34,197,94,.18); border:1px solid rgba(34,197,94,.35); color:var(--g)" onclick="openProfileGate()">Profile</button>
+          <button id="uiModeBtn" class="px-3 py-2 rounded-lg font-bold" style="background:rgba(99,102,241,.18); border:1px solid rgba(99,102,241,.35)" onclick="openViewSelector()">PC UI</button>
+          <button id="installBtn" class="hidden px-3 py-2 rounded-lg font-bold" style="background:var(--acc)">Install</button>
+        </div>
       </div>
 
       <div id="loginCard" class="hidden mt-6 glass rounded-2xl p-4 border">
@@ -220,6 +371,7 @@ console.log("✅ Backend Connected:", BACKEND);
                 <span class="w-2 h-2 rounded-full" style="background:var(--g); animation:blink 1.2s infinite"></span>
                 <span id="wsText">Connected</span>
               </span>
+              <span id="profileAppLabel" class="hidden sm:inline">| Profile: --</span>
               <span class="hidden sm:inline">|</span>
               <span id="regime" class="hidden sm:inline">Regime: --</span>
             </div>
@@ -233,7 +385,7 @@ console.log("✅ Backend Connected:", BACKEND);
             <div class="text-[10px]" id="tradeCooldown" style="color:var(--y)">Cooldown: ready</div>
           </div>
           <button id="resetBalanceBtn" class="px-3 py-2 rounded-xl font-bold" style="background:var(--y); color:#000" onclick="resetBalance()">Reset</button>
-          <button class="menuBtn px-3 py-2 rounded-xl font-bold" style="background:var(--acc)" onclick="toggleSide()">Menu</button>
+          <button class="menuBtn px-3 py-2 rounded-xl font-bold" style="background:var(--acc)" onclick="openSide()">Menu</button>
         </div>
       </div>
     </header>
@@ -375,12 +527,15 @@ console.log("✅ Backend Connected:", BACKEND);
       </main>
 
       <!-- Overlay -->
-      <div id="overlay" class="overlay" onclick="toggleSide()"></div>
+      <div id="overlay" class="overlay" onclick="closeSide()"></div>
 
       <!-- Side panel -->
       <aside id="side" class="side w-[320px] shrink-0 overflow-y-auto" style="background:var(--bg2); border-left:1px solid var(--b)">
         <div class="p-4 border-b" style="border-color:var(--b)">
-          <div class="text-sm font-black" style="color:var(--p)">Bot Control</div>
+          <div class="flex items-center justify-between gap-3">
+            <div class="text-sm font-black" style="color:var(--p)">Bot Control</div>
+            <button class="menuBtn px-3 py-2 rounded-xl font-bold" style="background:rgba(99,102,241,.18); border:1px solid rgba(99,102,241,.35)" onclick="closeSide()">Back</button>
+          </div>
           <button id="botBtn" class="mt-3 w-full px-4 py-4 rounded-2xl font-black" style="background:linear-gradient(135deg,var(--g),#16a34a)" onclick="toggleBot()">START BOT</button>
           <div id="botStatus" class="mt-2 text-xs text-center" style="color:var(--mut)">Bot is idle</div>
           <!-- Backend bot status badge -->
@@ -405,7 +560,7 @@ console.log("✅ Backend Connected:", BACKEND);
                 <div><b style="color:var(--txt)">1) Hard SL</b>: LONG closes when <code>price &lt;= SL</code>; SHORT closes when <code>price &gt;= SL</code>.</div>
                 <div><b style="color:var(--txt)">2) Hard TP</b>: LONG closes when <code>price &gt;= TP</code>; SHORT closes when <code>price &lt;= TP</code>.</div>
                 <div><b style="color:var(--txt)">3) Profit Lock (if ON)</b>: lock activates at profit threshold, trade continues; closes only if <code>price hits LockSL</code>.</div>
-                <div><b style="color:var(--txt)">4) PA + News</b>: bot opens only when Price Action or strong News signal appears.</div>
+                <div><b style="color:var(--txt)">4) Entry Strategy</b>: bot opens only on the selected strategy signal, either <code>PA + News</code> or <code>UT Bot</code>.</div>
               </div>
             </details>
           </div>
@@ -486,10 +641,10 @@ console.log("✅ Backend Connected:", BACKEND);
             </div>
           </div>
           <div class="mt-2 grid grid-cols-1 gap-2">
-            <button id="strategyPaBtn" class="px-3 py-2 rounded-xl text-xs font-black" style="background:linear-gradient(135deg,var(--g),#16a34a)" onclick="toggleStrategySwitch('priceAction')">Price Action: ON</button>
-            <button id="strategyNewsBtn" class="px-3 py-2 rounded-xl text-xs font-black" style="background:linear-gradient(135deg,var(--g),#16a34a)" onclick="toggleStrategySwitch('newsFilter')">News Signal: ON</button>
+            <button id="strategyPaBtn" class="px-3 py-2 rounded-xl text-xs font-black" style="background:rgba(107,114,128,.25)" onclick="toggleStrategySwitch('priceAction')">PA + News: OFF</button>
+            <button id="strategyUtBtn" class="px-3 py-2 rounded-xl text-xs font-black" style="background:rgba(107,114,128,.25)" onclick="toggleStrategySwitch('utBot')">UT Bot: OFF</button>
           </div>
-          <div id="strategyNewsStatus" class="mt-1 text-[9px]" style="color:var(--mut)">News: --</div>
+          <div id="strategyNewsStatus" class="mt-1 text-[9px]" style="color:var(--mut)">Strategy: OFF</div>
 
           <div class="mt-2 grid grid-cols-2 gap-2">
             <div>
@@ -497,8 +652,8 @@ console.log("✅ Backend Connected:", BACKEND);
               <button id="strictBtn" class="w-full px-3 py-2 rounded-xl font-black text-xs" style="background:rgba(107,114,128,.25)" onclick="toggleStrict()">Less-Strict</button>
             </div>
             <div>
-              <div class="text-[10px]" style="color:var(--mut)">Logic</div>
-              <div class="w-full px-3 py-2 rounded-xl text-[11px] font-black text-center" style="background:rgba(107,114,128,.25)">PA + NEWS ONLY</div>
+              <div class="text-[10px]" style="color:var(--mut)">Strategy</div>
+              <div id="strategyModeLabel" class="w-full px-3 py-2 rounded-xl text-[11px] font-black text-center" style="background:rgba(107,114,128,.25)">NOT SELECTED</div>
             </div>
           </div>
 
@@ -520,7 +675,7 @@ console.log("✅ Backend Connected:", BACKEND);
           </div>
 
           <div class="mt-3 text-[10px]" style="color:var(--mut)">
-            One trade per timeframe is enforced (15m/30m). Trades open only on Price Action or strong News signals.
+            One trade per timeframe is enforced (15m/30m). Trades open only on the selected strategy signal.
           </div>
         </div>
 
@@ -621,11 +776,11 @@ console.log("✅ Backend Connected:", BACKEND);
             <button id="deltaConnectBtn" class="flex-1 px-3 py-2 rounded-xl text-xs font-black" style="background:var(--acc)" onclick="deltaConnect()">Connect Backend</button>
           </div>
           <div class="mt-2 rounded-xl px-3 py-2 text-[10px] font-black" style="background:rgba(34,197,94,.12); color:var(--g); border:1px solid rgba(34,197,94,.35)">
-            Auto-connect also stays ON. Delta trading follows START BOT / STOP BOT.
+            Auto-connect stays ON. Bracket SL/TP stays only as you set it.
           </div>
 
           <div class="mt-2">
-            <button id="deltaBracketBtn" class="w-full px-3 py-2 rounded-xl text-xs font-black" style="background:linear-gradient(135deg,var(--g),#16a34a)" onclick="toggleDeltaBracket()">Bracket SL/TP: ON</button>
+            <button id="deltaBracketBtn" class="w-full px-3 py-2 rounded-xl text-xs font-black" style="background:rgba(107,114,128,.25)" onclick="toggleDeltaBracket()">Bracket SL/TP: OFF</button>
             <div class="mt-1 text-[9px]" style="color:var(--mut)">When ON: Delta orders include SL/TP brackets.</div>
           </div>
 
@@ -660,7 +815,7 @@ console.log("✅ Backend Connected:", BACKEND);
     <!-- Mobile bottom bar -->
     <div class="mobilebar">
       <button id="mBot" class="flex-1 px-4 py-3 rounded-2xl font-black" style="background:linear-gradient(135deg,var(--g),#16a34a)" onclick="toggleBot()">START BOT</button>
-      <button class="px-4 py-3 rounded-2xl font-black" style="background:var(--acc)" onclick="toggleSide()">Menu</button>
+      <button class="px-4 py-3 rounded-2xl font-black" style="background:var(--acc)" onclick="openSide()">Menu</button>
     </div>
   </div>
 
@@ -792,14 +947,16 @@ document.addEventListener('visibilitychange', async ()=>{
 });
 
 function exportBackup(){
+  if(!PROFILE.id) return toast('Pehle profile open karo', 'error');
   try{
     const payload = {
-      v: 2,
+      v: 3,
       exportedAt: Date.now(),
-      cacheKey: CONFIG.CACHE_KEY,
-      trainKey: CONFIG.TRAIN_CACHE,
+      profile: { id: PROFILE.id, name: PROFILE.name },
       coins: store.coins,
-      train: JSON.parse(localStorage.getItem(CONFIG.TRAIN_CACHE) || '{}')
+      train: loadProfileSection('train', {}) || {},
+      delta: loadProfileSection('delta', null),
+      auth: loadProfileSection('auth', null),
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
     const url = URL.createObjectURL(blob);
@@ -815,6 +972,11 @@ function exportBackup(){
 }
 
 function importBackup(ev){
+  if(!PROFILE.id){
+    toast('Import se pehle profile open karo', 'error');
+    if(ev?.target) ev.target.value = '';
+    return;
+  }
   const file = ev?.target?.files?.[0];
   if(!file) return;
   const reader = new FileReader();
@@ -828,19 +990,31 @@ function importBackup(ev){
           store.coins[s].tf = normalizeTf(store.coins[s].tf);
           store.coins[s].candlesByTf = createTfCandleMap(store.coins[s].candlesByTf);
           store.coins[s].enabledTf = createTfEnabledMap(store.coins[s].enabledTf);
+          const importedStrategy = String(store.coins[s].entryStrategy || '').trim();
+          if(importedStrategy === 'priceAction' || importedStrategy === 'utBot'){
+            store.coins[s].entryStrategy = importedStrategy;
+            store.coins[s].strategySwitch = {
+              nn: false,
+              priceAction: importedStrategy === 'priceAction',
+              utBot: importedStrategy === 'utBot',
+              newsFilter: importedStrategy === 'priceAction',
+            };
+          } else {
+            store.coins[s].entryStrategy = '';
+            store.coins[s].strategySwitch = { nn: false, priceAction: false, utBot: false, newsFilter: false };
+          }
           store.coins[s].lastTradeCandleTimeByTf ||= {};
           store.coins[s].sigByTf ||= {};
           store.coins[s].nnByTf ||= {};
           store.coins[s].nextByTf ||= {};
-          if(Array.isArray(store.coins[s].trades)){
-            store.coins[s].trades = store.coins[s].trades.map(t => ({ ...t, tf: normalizeTf(t?.tf) }));
-          }
-          if(Array.isArray(store.coins[s].history)){
-            store.coins[s].history = store.coins[s].history.map(t => ({ ...t, tf: normalizeTf(t?.tf) }));
-          }
+          store.coins[s].trades = normalizeTradeList((store.coins[s].trades || []).map(t => ({ symbol:s, ...t })), 'local').filter(t => !t.closed);
+          store.coins[s].history = normalizeTradeList((store.coins[s].history || []).map(t => ({ symbol:s, ...t })), 'local').map(t => ({ ...t, closed: true }));
         }
       }
-      if(data.train) localStorage.setItem(CONFIG.TRAIN_CACHE, JSON.stringify(data.train));
+      saveProfileSection('app', { v: data?.v || 3, ts: Date.now(), coins: store.coins });
+      if(data.train) saveProfileSection('train', data.train);
+      if(data.delta) saveProfileSection('delta', data.delta);
+      if(data.auth) saveProfileSection('auth', data.auth);
       saveAll();
       toast('Backup imported. Reloading UI...','success');
       if(store.current){ const cur=store.current; goBack(); setTimeout(()=>selectCoin(cur), 150); }
@@ -873,6 +1047,8 @@ const CONFIG = {
   USD_TO_INR: 83,
   CACHE_KEY: 'aitb_v20_adv_mtf',
   TRAIN_CACHE: 'aitb_nn_train_v20',
+  PROFILE_ROOT_KEY: 'aitb_profiles_v1',
+  UI_MODE_CACHE: 'aitb_ui_mode_v1',
   PRICE_POLL_MS: 400,
   CANDLE_POLL_MS: 500,
   CANDLE_BOOT_LIMIT: 1000,
@@ -897,6 +1073,174 @@ const CONFIG = {
   NN_CONF_SETUP_15M: 50,
   ATRPCT_MIN_15M: 0.06, // %
 };
+
+const PROFILE = {
+  id: '',
+  name: '',
+  root: null,
+};
+
+function cloneData(value){
+  if(value == null) return value;
+  try{ return JSON.parse(JSON.stringify(value)); }catch(e){ return value; }
+}
+function emptyProfileRoot(){
+  return { v: 1, lastProfileId: '', profiles: {} };
+}
+function normalizeProfileName(name){
+  return String(name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+}
+function profileIdFromName(name){
+  return normalizeProfileName(name).toLowerCase();
+}
+function readJsonStorage(key){
+  try{
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){
+    return null;
+  }
+}
+function writeJsonStorage(key, value){
+  try{
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+function getProfileRoot(){
+  if(PROFILE.root) return PROFILE.root;
+  const root = readJsonStorage(CONFIG.PROFILE_ROOT_KEY);
+  PROFILE.root = (root && typeof root === 'object' && root.profiles && typeof root.profiles === 'object')
+    ? root
+    : emptyProfileRoot();
+  if(!Object.keys(PROFILE.root.profiles || {}).length){
+    const legacyApp = readJsonStorage(CONFIG.CACHE_KEY);
+    const legacyTrain = readJsonStorage(CONFIG.TRAIN_CACHE);
+    const legacyDelta = readJsonStorage(CONFIG.DELTA_CACHE);
+    const legacyAuth = readJsonStorage(CONFIG.AUTH_CACHE);
+    if(legacyApp || legacyTrain || legacyDelta || legacyAuth){
+      const now = Date.now();
+      PROFILE.root.profiles.default = {
+        id: 'default',
+        displayName: 'Default',
+        createdAt: now,
+        updatedAt: now,
+        app: legacyApp || null,
+        train: legacyTrain || {},
+        delta: legacyDelta || null,
+        auth: legacyAuth || null,
+      };
+      PROFILE.root.lastProfileId = PROFILE.root.lastProfileId || 'default';
+      writeJsonStorage(CONFIG.PROFILE_ROOT_KEY, PROFILE.root);
+    }
+  }
+  return PROFILE.root;
+}
+function saveProfileRoot(){
+  return writeJsonStorage(CONFIG.PROFILE_ROOT_KEY, getProfileRoot());
+}
+function getProfileBucket(create=false){
+  if(!PROFILE.id) return null;
+  const root = getProfileRoot();
+  if(!root.profiles[PROFILE.id] && create){
+    const now = Date.now();
+    root.profiles[PROFILE.id] = {
+      id: PROFILE.id,
+      displayName: PROFILE.name || PROFILE.id,
+      createdAt: now,
+      updatedAt: now,
+      app: null,
+      train: {},
+      delta: null,
+      auth: null,
+    };
+  }
+  const bucket = root.profiles[PROFILE.id] || null;
+  if(bucket){
+    bucket.displayName = PROFILE.name || bucket.displayName || PROFILE.id;
+  }
+  return bucket;
+}
+function getSavedProfiles(){
+  const root = getProfileRoot();
+  return Object.values(root.profiles || {})
+    .map(p => ({
+      id: String(p?.id || ''),
+      name: normalizeProfileName(p?.displayName || p?.id || ''),
+      updatedAt: Number(p?.updatedAt || p?.createdAt || 0),
+      createdAt: Number(p?.createdAt || 0),
+    }))
+    .filter(p => p.id && p.name)
+    .sort((a,b)=>b.updatedAt-a.updatedAt);
+}
+function getLastProfileName(){
+  const root = getProfileRoot();
+  const bucket = root.profiles?.[root.lastProfileId || ''];
+  return normalizeProfileName(bucket?.displayName || '');
+}
+function saveProfileSection(section, value){
+  const bucket = getProfileBucket(true);
+  if(!bucket) return;
+  bucket[section] = cloneData(value);
+  bucket.updatedAt = Date.now();
+  const root = getProfileRoot();
+  root.lastProfileId = PROFILE.id;
+  saveProfileRoot();
+}
+function loadProfileSection(section, fallback=null){
+  const bucket = getProfileBucket(false);
+  if(!bucket) return cloneData(fallback);
+  const value = bucket[section];
+  return value == null ? cloneData(fallback) : cloneData(value);
+}
+function resetStoreState(){
+  store.current = null;
+  store.coins = Object.fromEntries(symbols.map(s => [s, freshCoin()]));
+}
+function resetDeltaState(){
+  DELTA.connected = false;
+  DELTA.live = false;
+  DELTA.mode = 'live';
+  DELTA.proxy = '';
+  DELTA.backend = (window.__DELTA_BACKEND_AUTO__ || 'http://127.0.0.1:7860');
+  DELTA.maxSlipPct = 1.0;
+  DELTA.bracket = false;
+  DELTA.ipInfo = null;
+  DELTA.creds.live = { key:'', secret:'' };
+  DELTA.creds.demo = { key:'', secret:'' };
+  DELTA.productMapByMode.live = emptyProductMap('live');
+  DELTA.productMapByMode.demo = emptyProductMap('demo');
+}
+function resetAuthState(){
+  AUTH.required = false;
+  AUTH.token = '';
+  AUTH.userId = '';
+}
+function currentProfileName(){
+  return PROFILE.name || 'No profile';
+}
+function updateProfileLabels(){
+  const coin = document.getElementById('profileCoinLabel');
+  const app = document.getElementById('profileAppLabel');
+  if(coin) coin.textContent = `Profile: ${currentProfileName()}`;
+  if(app) app.textContent = `| Profile: ${currentProfileName()}`;
+}
+function renderProfileList(){
+  const box = document.getElementById('profileList');
+  if(!box) return;
+  const profiles = getSavedProfiles();
+  if(!profiles.length){
+    box.innerHTML = `<div class="text-xs" style="color:var(--mut)">Abhi tak koi saved profile nahi hai.</div>`;
+    return;
+  }
+  box.innerHTML = profiles.map(profile => `
+    <button class="px-3 py-2 rounded-2xl text-sm font-black" style="background:${profile.id===PROFILE.id?'linear-gradient(135deg,var(--acc),#8b5cf6)':'rgba(99,102,241,.12)'}; border:1px solid rgba(99,102,241,.28); color:white" onclick='continueWithProfile(${JSON.stringify(profile.name)})'>
+      ${profile.name}
+    </button>
+  `).join('');
+}
 
 const DELTA_MODES = ['live','demo'];
 const DEFAULT_PRODUCT_MAP_BY_MODE = {
@@ -967,8 +1311,8 @@ const DELTA = {
   backend: (window.__DELTA_BACKEND_AUTO__ || 'http://127.0.0.1:7860'),
   // Skip order if Delta bid/ask deviates too much from app price
   maxSlipPct: 1.0,
-  // Attach SL/TP on exchange using Delta bracket fields (recommended)
-  bracket: true,
+  // Attach SL/TP on exchange using Delta bracket fields (manual toggle)
+  bracket: false,
 
   // symbol -> Delta product_id mapping by mode
   productMapByMode: {
@@ -1002,6 +1346,32 @@ function createTfEnabledMap(src){
 }
 function normalizeTf(tf){
   return TF_LIST.includes(tf) ? tf : DEFAULT_TF;
+}
+function normalizeBotTradeTfInPlace(st, preferred=null){
+  if(!st) return DEFAULT_TF;
+  st.tf = normalizeTf(st.tf);
+  st.enabledTf = createTfEnabledMap(st.enabledTf);
+  let target = TF_LIST.includes(preferred) ? preferred : null;
+  if(!target){
+    const enabled = TF_LIST.filter(tf => !!st.enabledTf?.[tf]);
+    if(enabled.includes(st.tf)) target = st.tf;
+    else target = enabled[0] || st.tf || DEFAULT_TF;
+  }
+  target = normalizeTf(target);
+  for(const tf of TF_LIST) st.enabledTf[tf] = (tf === target);
+  st.tf = target;
+  return target;
+}
+function getBotTradeTf(st){
+  return normalizeBotTradeTfInPlace(st || getState());
+}
+function syncEnabledTfButtons(st){
+  const activeTf = getBotTradeTf(st || getState());
+  for(const tf of TF_LIST){
+    const btn = document.getElementById('tf_'+tf);
+    if(btn) btn.style.background = tf === activeTf ? 'var(--g)' : 'var(--r)';
+  }
+  return activeTf;
 }
 
 function freshCoin(){
@@ -1049,10 +1419,12 @@ function freshCoin(){
     // bot tuning
     strictMode: false,          // false = Less-Strict, true = Strict
     logicMode: 'pro',           // 'pro' (MTF) | 'user' (your rule)
+    entryStrategy: '',
     strategySwitch: {
       nn: false,
-      priceAction: true,
-      newsFilter: true,
+      priceAction: false,
+      utBot: false,
+      newsFilter: false,
     },
     newsSentiment: { bias: 'neutral', score: 0, ts: 0, headline: '' },
 
@@ -1085,64 +1457,285 @@ const store = {
   coins: Object.fromEntries(symbols.map(s => [s, freshCoin()])),
 };
 
+function normalizeUiMode(mode){
+  return String(mode || '').toLowerCase() === 'phone' ? 'phone' : 'pc';
+}
+function readUiMode(){
+  try{
+    const raw = localStorage.getItem(CONFIG.UI_MODE_CACHE) || '';
+    return raw ? normalizeUiMode(raw) : '';
+  }catch(e){
+    return '';
+  }
+}
+function updateUiModeButton(){
+  const btn = document.getElementById('uiModeBtn');
+  if(btn) btn.textContent = normalizeUiMode(readUiMode() || 'pc') === 'phone' ? 'Phone UI' : 'PC UI';
+}
+function hideEntryScreens(){
+  document.getElementById('profileGate')?.classList.add('hidden');
+  document.getElementById('coinSelect')?.classList.add('hidden');
+  document.getElementById('app')?.classList.add('hidden');
+}
+function openProfileGate(prefill=''){
+  hideEntryScreens();
+  document.getElementById('viewSelect').classList.add('hidden');
+  document.getElementById('profileGate').classList.remove('hidden');
+  const input = document.getElementById('profileNameInput');
+  const nextValue = normalizeProfileName(prefill || PROFILE.name || getLastProfileName());
+  if(input){
+    input.value = nextValue;
+    setTimeout(()=>{ try{ input.focus(); input.select(); }catch(e){} }, 30);
+  }
+  renderProfileList();
+  updateProfileLabels();
+}
+function showWorkspaceEntryScreen(){
+  hideEntryScreens();
+  if(PROFILE.id) document.getElementById('coinSelect').classList.remove('hidden');
+  else openProfileGate();
+  updateProfileLabels();
+}
+function applyUiMode(mode, opts={}){
+  const next = normalizeUiMode(mode);
+  document.body.classList.toggle('ui-phone', next === 'phone');
+  document.body.classList.toggle('ui-pc', next !== 'phone');
+  if(opts.save !== false){
+    try{ localStorage.setItem(CONFIG.UI_MODE_CACHE, next); }catch(e){}
+  }
+  updateUiModeButton();
+  setTimeout(()=>{
+    if(!chart) return;
+    const el = document.getElementById('chart');
+    if(!el) return;
+    chart.applyOptions({ width: el.clientWidth, height: Math.max(320, el.clientHeight || 360) });
+  }, 40);
+}
+function openViewSelector(){
+  document.getElementById('coinSelect').classList.add('hidden');
+  document.getElementById('profileGate').classList.add('hidden');
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('viewSelect').classList.remove('hidden');
+}
+function chooseUiMode(mode){
+  applyUiMode(mode);
+  document.getElementById('viewSelect').classList.add('hidden');
+  showWorkspaceEntryScreen();
+}
+function showInitialScreen(){
+  document.getElementById('splash').classList.add('hidden');
+  const savedMode = readUiMode();
+  if(savedMode){
+    applyUiMode(savedMode, { save:false });
+    openProfileGate();
+  } else {
+    document.getElementById('viewSelect').classList.remove('hidden');
+    updateUiModeButton();
+  }
+}
+async function continueWithProfile(nameOverride=''){
+  const name = normalizeProfileName(nameOverride || document.getElementById('profileNameInput')?.value || '');
+  if(!name){
+    toast('Profile name likho', 'error');
+    return;
+  }
+  disconnectCandleWS();
+  if(chart){ chart.remove(); chart=null; cs=null; ma7=null; ma25=null; ma99=null; emaFastLine=null; emaSlowLine=null; }
+  PROFILE.id = profileIdFromName(name);
+  PROFILE.name = name;
+  const bucket = getProfileBucket(true);
+  if(bucket){
+    bucket.displayName = name;
+    bucket.updatedAt = Date.now();
+    getProfileRoot().lastProfileId = PROFILE.id;
+    saveProfileRoot();
+  }
+  resetStoreState();
+  resetDeltaState();
+  resetAuthState();
+  loadAll();
+  deltaLoad();
+  try{ await authBootstrap(); }catch(e){}
+  try{ await deltaLoadBackendCreds(deltaNormalizeMode(DELTA.mode), { silent:true }); }catch(e){}
+  deltaQueueAutoConnect(900);
+  updateProfileLabels();
+  renderProfileList();
+  document.getElementById('profileGate').classList.add('hidden');
+  document.getElementById('coinSelect').classList.remove('hidden');
+  toast(`Profile loaded: ${name}`, 'success');
+}
+
+function parseTradeTimeMs(value){
+  if(value == null || value === '') return 0;
+  if(typeof value === 'number' && Number.isFinite(value)){
+    if(value > 1e12) return Math.round(value);
+    if(value > 1e9) return Math.round(value * 1000);
+    return Math.round(value);
+  }
+  const raw = String(value).trim();
+  if(!raw) return 0;
+  const numeric = Number(raw);
+  if(Number.isFinite(numeric)){
+    if(numeric > 1e12) return Math.round(numeric);
+    if(numeric > 1e9) return Math.round(numeric * 1000);
+    return Math.round(numeric);
+  }
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+function tradeSyncKey(trade, fallbackSource='local'){
+  const src = String(trade?.syncSource || trade?.source || fallbackSource || 'local');
+  const id = Number(trade?.id || 0);
+  if(Number.isFinite(id) && id > 0) return `${src}:${id}`;
+  const symbol = String(trade?.symbol || '').toUpperCase();
+  const tf = normalizeTf(trade?.tf || '15m');
+  const side = String(trade?.side || '');
+  const time = Number(trade?.entryTime || 0) || (Number(trade?.entryCandleTime || 0) * 1000);
+  const price = Number(trade?.entry || 0);
+  return `${src}:${symbol}:${tf}:${side}:${time}:${price.toFixed(4)}`;
+}
+function normalizeTradeRecord(raw, fallbackSource='local'){
+  const src = String(raw?.syncSource || raw?.source || fallbackSource || 'local');
+  const symbol = String(raw?.symbol || store.current || '').toUpperCase();
+  const tf = normalizeTf(raw?.tf || '15m');
+  const lot = deltaNormalizeLots(raw?.lot || 1);
+  const qtyBaseRaw = Number(raw?.qtyBase ?? raw?.qty);
+  const qtyBase = Number.isFinite(qtyBaseRaw) && qtyBaseRaw > 0 ? qtyBaseRaw : lotsToBaseQty(symbol, lot);
+  const entryTime = parseTradeTimeMs(raw?.entryTime ?? raw?.entry_time_ms ?? raw?.entry_time);
+  const exitTime = parseTradeTimeMs(raw?.exitTime ?? raw?.exit_time);
+  const entryCandleTimeRaw = Number(raw?.entryCandleTime ?? raw?.entry_candle_time ?? 0);
+  const entryCandleTime = Number.isFinite(entryCandleTimeRaw) && entryCandleTimeRaw > 0 ? Math.round(entryCandleTimeRaw) : 0;
+  const entryRaw = Number(raw?.entry);
+  const exitRaw = Number(raw?.exit);
+  const slRaw = Number(raw?.sl);
+  const tpRaw = Number(raw?.tp);
+  const pnlUsdRaw = Number(raw?.pnlUsd ?? raw?.pnl_usd);
+  const pnlInrRaw = Number(raw?.pnlINR ?? raw?.pnl_inr);
+  const maxProfitInrRaw = Number(raw?.maxProfitINR ?? raw?.max_profit_inr);
+  const maxLossInrRaw = Number(raw?.maxLossINR ?? raw?.max_loss_inr);
+  const idRaw = Number(raw?.id || 0);
+  const entry = Number.isFinite(entryRaw) ? entryRaw : 0;
+  const exit = Number.isFinite(exitRaw) ? exitRaw : 0;
+  const pnlUsd = Number.isFinite(pnlUsdRaw) ? pnlUsdRaw : 0;
+  return {
+    ...raw,
+    id: Number.isFinite(idRaw) && idRaw > 0 ? Math.round(idRaw) : Math.max(1, entryTime || (entryCandleTime * 1000) || Date.now()),
+    symbol,
+    side: String(raw?.side || '').toUpperCase(),
+    tf,
+    lot,
+    lotUnit: 'delta_lot',
+    qtyBase,
+    entry,
+    sl: Number.isFinite(slRaw) ? slRaw : 0,
+    tp: Number.isFinite(tpRaw) ? tpRaw : 0,
+    rr: String(raw?.rr || '1:1'),
+    strategy: String(raw?.strategy || 'Combined PA + News'),
+    entryTime,
+    entryCandleTime,
+    exit,
+    exitTime,
+    reason: String(raw?.reason || raw?.event || ''),
+    pnlUsd,
+    pnlINR: Number.isFinite(pnlInrRaw) ? pnlInrRaw : (pnlUsd * CONFIG.USD_TO_INR),
+    maxProfitINR: Number.isFinite(maxProfitInrRaw) ? maxProfitInrRaw : 0,
+    maxLossINR: Number.isFinite(maxLossInrRaw) ? maxLossInrRaw : 0,
+    closed: raw?.closed === false ? false : (src.includes('history') || exitTime > 0 || Number.isFinite(exitRaw)),
+    syncSource: src,
+    syncKey: tradeSyncKey({ ...raw, symbol, tf, entryTime, entryCandleTime, entry }, src),
+  };
+}
+function normalizeTradeList(list, fallbackSource='local'){
+  if(!Array.isArray(list)) return [];
+  return list
+    .map(item => normalizeTradeRecord(item, fallbackSource))
+    .filter(item => item.symbol);
+}
+function mergeTradeHistory(existing, incoming, fallbackSource='backend_bot_history'){
+  const map = new Map();
+  normalizeTradeList(existing, 'local').forEach(trade => {
+    map.set(trade.syncKey, trade);
+  });
+  normalizeTradeList(incoming, fallbackSource).forEach(trade => {
+    map.set(trade.syncKey, { ...trade, closed: true });
+  });
+  return Array.from(map.values()).sort((a,b)=>Number(b.exitTime || b.entryTime || 0) - Number(a.exitTime || a.entryTime || 0));
+}
+function mergeOpenTrades(existing, incoming, fallbackSource='backend_bot_open'){
+  const map = new Map();
+  normalizeTradeList(existing, 'local')
+    .filter(trade => !trade.closed)
+    .forEach(trade => map.set(trade.syncKey, trade));
+  normalizeTradeList(incoming, fallbackSource)
+    .filter(trade => !trade.closed)
+    .forEach(trade => map.set(trade.syncKey, { ...trade, closed:false }));
+  return Array.from(map.values()).sort((a,b)=>Number(b.entryTime || 0) - Number(a.entryTime || 0));
+}
+
 /*********************
  * Load/save
  *********************/
 function saveAll(){
   try{
     const payload = { v: 20, ts: Date.now(), coins: store.coins };
-    localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify(payload));
+    saveProfileSection('app', payload);
   }catch(e){}
 }
 function loadAll(){
   try{
-    const raw = localStorage.getItem(CONFIG.CACHE_KEY);
-    if(raw){
-      const data = JSON.parse(raw);
-      if(data?.coins){
-        for(const s of symbols){
-          if(data.coins[s]){
-            store.coins[s] = { ...freshCoin(), ...data.coins[s] };
-            store.coins[s].tf = normalizeTf(store.coins[s].tf);
-            store.coins[s].candlesByTf = createTfCandleMap(store.coins[s].candlesByTf);
-            store.coins[s].enabledTf = createTfEnabledMap(store.coins[s].enabledTf);
-            store.coins[s].flipStrategyEnabled = false;
-            store.coins[s].flipBacktest ||= null;
-            store.coins[s].flipBacktestAt ||= 0;
-            store.coins[s].lastTradeCandleTimeByTf ||= {};
-            store.coins[s].sigByTf ||= {};
-            store.coins[s].nnByTf ||= {};
-            store.coins[s].nextByTf ||= {};
-            store.coins[s].lastComputedAtByTf ||= {};
-            store.coins[s].instant = { ...freshCoin().instant, ...(store.coins[s].instant || {}) };
-            store.coins[s].instant.tf = normalizeTf(store.coins[s].instant.tf || '15m');
-            store.coins[s].instant.lastAutoClosedByTf ||= {};
-            store.coins[s].defaultLot = deltaNormalizeLots(store.coins[s].defaultLot || 1);
-            store.coins[s].maxTradesPerDay = Math.max(1, Math.min(10, Number(store.coins[s].maxTradesPerDay || 10)));
-            store.coins[s].dailyTradeCounter ||= { day: '', count: 0 };
-            store.coins[s].dailyTradeCounter.day = String(store.coins[s].dailyTradeCounter.day || '');
-            store.coins[s].dailyTradeCounter.count = Math.max(0, parseInt(store.coins[s].dailyTradeCounter.count || 0, 10) || 0);
-            store.coins[s].strategySwitch = { nn: false, priceAction: true, newsFilter: true };
-            store.coins[s].newsSentiment = { ...freshCoin().newsSentiment, ...(store.coins[s].newsSentiment || {}) };
-            store.coins[s].cooldownUntil = Number(store.coins[s].cooldownUntil || 0);
-            store.coins[s].cooldownReason = String(store.coins[s].cooldownReason || '');
-            store.coins[s].autoResumeBotAt = Number(store.coins[s].autoResumeBotAt || 0);
-            store.coins[s].autoResumeBot = !!store.coins[s].autoResumeBot;
-            store.coins[s].pendingFlip = store.coins[s].pendingFlip || null;
-            if(Array.isArray(store.coins[s].trades)){
-              store.coins[s].trades = store.coins[s].trades.map(t => ({ ...t, tf: normalizeTf(t?.tf) }));
-            }
-            if(Array.isArray(store.coins[s].history)){
-              store.coins[s].history = store.coins[s].history.map(t => ({ ...t, tf: normalizeTf(t?.tf) }));
-            }
+    resetStoreState();
+    const data = loadProfileSection('app', null);
+    if(data?.coins){
+      for(const s of symbols){
+        if(data.coins[s]){
+          store.coins[s] = { ...freshCoin(), ...data.coins[s] };
+          store.coins[s].tf = normalizeTf(store.coins[s].tf);
+          store.coins[s].candlesByTf = createTfCandleMap(store.coins[s].candlesByTf);
+          store.coins[s].enabledTf = createTfEnabledMap(store.coins[s].enabledTf);
+          normalizeBotTradeTfInPlace(store.coins[s]);
+          store.coins[s].flipStrategyEnabled = false;
+          store.coins[s].flipBacktest ||= null;
+          store.coins[s].flipBacktestAt ||= 0;
+          store.coins[s].lastTradeCandleTimeByTf ||= {};
+          store.coins[s].sigByTf ||= {};
+          store.coins[s].nnByTf ||= {};
+          store.coins[s].nextByTf ||= {};
+          store.coins[s].lastComputedAtByTf ||= {};
+          store.coins[s].instant = { ...freshCoin().instant, ...(store.coins[s].instant || {}) };
+          store.coins[s].instant.tf = normalizeTf(store.coins[s].instant.tf || '15m');
+          store.coins[s].instant.lastAutoClosedByTf ||= {};
+          store.coins[s].defaultLot = deltaNormalizeLots(store.coins[s].defaultLot || 1);
+          store.coins[s].maxTradesPerDay = Math.max(1, Math.min(10, Number(store.coins[s].maxTradesPerDay || 10)));
+          store.coins[s].dailyTradeCounter ||= { day: '', count: 0 };
+          store.coins[s].dailyTradeCounter.day = String(store.coins[s].dailyTradeCounter.day || '');
+          store.coins[s].dailyTradeCounter.count = Math.max(0, parseInt(store.coins[s].dailyTradeCounter.count || 0, 10) || 0);
+          const savedStrategy = String(store.coins[s].entryStrategy || '').trim();
+          if(savedStrategy === 'priceAction' || savedStrategy === 'utBot'){
+            store.coins[s].entryStrategy = savedStrategy;
+            store.coins[s].strategySwitch = {
+              nn: false,
+              priceAction: savedStrategy === 'priceAction',
+              utBot: savedStrategy === 'utBot',
+              newsFilter: savedStrategy === 'priceAction',
+            };
+          } else {
+            store.coins[s].entryStrategy = '';
+            store.coins[s].strategySwitch = { nn: false, priceAction: false, utBot: false, newsFilter: false };
           }
+          store.coins[s].newsSentiment = { ...freshCoin().newsSentiment, ...(store.coins[s].newsSentiment || {}) };
+          store.coins[s].cooldownUntil = Number(store.coins[s].cooldownUntil || 0);
+          store.coins[s].cooldownReason = String(store.coins[s].cooldownReason || '');
+          store.coins[s].autoResumeBotAt = Number(store.coins[s].autoResumeBotAt || 0);
+          store.coins[s].autoResumeBot = !!store.coins[s].autoResumeBot;
+          store.coins[s].pendingFlip = store.coins[s].pendingFlip || null;
+          store.coins[s].trades = normalizeTradeList((store.coins[s].trades || []).map(t => ({ symbol:s, ...t })), 'local').filter(t => !t.closed);
+          store.coins[s].history = normalizeTradeList((store.coins[s].history || []).map(t => ({ symbol:s, ...t })), 'local').map(t => ({ ...t, closed: true }));
         }
       }
     }
     // training store
-    const train = localStorage.getItem(CONFIG.TRAIN_CACHE);
-    if(train){
-      const t = JSON.parse(train);
+    const t = loadProfileSection('train', null);
+    if(t){
       for(const s of symbols){
         if(t?.[s]) store.coins[s].nnTrain = { ...store.coins[s].nnTrain, ...t[s] };
       }
@@ -1699,10 +2292,21 @@ function switchTab(tab, btn){
     el.classList.toggle('hidden', t!==tab);
   });
 }
+function openSide(){
+  if(window.innerWidth >= 1024) return;
+  document.getElementById('side')?.classList.add('open');
+  document.getElementById('overlay')?.classList.add('open');
+}
+function closeSide(){
+  if(window.innerWidth >= 1024) return;
+  document.getElementById('side')?.classList.remove('open');
+  document.getElementById('overlay')?.classList.remove('open');
+}
 function toggleSide(){
   if(window.innerWidth >= 1024) return;
-  document.getElementById('side').classList.toggle('open');
-  document.getElementById('overlay').classList.toggle('open');
+  const side = document.getElementById('side');
+  if(side?.classList.contains('open')) closeSide();
+  else openSide();
 }
 
 /*********************
@@ -1844,35 +2448,69 @@ function markTradeOpenedToday(st){
   const c = getDailyCounter(st);
   c.count += 1;
 }
+function getActiveEntryStrategy(st){
+  const chosen = String(st?.entryStrategy || '').trim();
+  if(chosen === 'utBot' || chosen === 'priceAction') return chosen;
+  if(st?.strategySwitch?.utBot) return 'utBot';
+  if(st?.strategySwitch?.priceAction) return 'priceAction';
+  return '';
+}
 function syncStrategyUI(){
   if(!store.current) return;
   const st = getState();
-  st.strategySwitch = { nn: false, priceAction: true, newsFilter: true };
+  const activeStrategy = getActiveEntryStrategy(st);
+  st.entryStrategy = activeStrategy;
+  st.strategySwitch = {
+    nn: false,
+    priceAction: activeStrategy === 'priceAction',
+    utBot: activeStrategy === 'utBot',
+    newsFilter: activeStrategy === 'priceAction',
+  };
   const paBtn = document.getElementById('strategyPaBtn');
-  const newsBtn = document.getElementById('strategyNewsBtn');
+  const utBtn = document.getElementById('strategyUtBtn');
   const paint = (el, on, label)=>{
     if(!el) return;
     el.textContent = `${label}: ${on ? 'ON' : 'OFF'}`;
     el.style.background = on ? 'linear-gradient(135deg,var(--g),#16a34a)' : 'rgba(107,114,128,.25)';
   };
-  paint(paBtn, !!st.strategySwitch.priceAction, 'Price Action');
-  paint(newsBtn, !!st.strategySwitch.newsFilter, 'News Signal');
+  paint(paBtn, activeStrategy === 'priceAction', 'PA + News');
+  paint(utBtn, activeStrategy === 'utBot', 'UT Bot');
+  const modeEl = document.getElementById('strategyModeLabel');
+  if(modeEl) modeEl.textContent = activeStrategy === 'utBot' ? 'UT BOT' : activeStrategy === 'priceAction' ? 'PA + NEWS' : 'NOT SELECTED';
   const tag = document.getElementById('strategyNewsStatus');
   if(tag){
     const n = st.newsSentiment || {};
-    const ageMin = n.ts ? Math.max(0, Math.round((Date.now() - Number(n.ts)) / 60000)) : null;
-    const ageTxt = ageMin == null ? '' : ` | ${ageMin}m ago`;
-    tag.textContent = `News: ${(n.bias || 'neutral').toUpperCase()} (${Math.round(Number(n.score || 0))})${ageTxt}`;
-    tag.style.color = (n.bias === 'bullish') ? 'var(--g)' : (n.bias === 'bearish') ? 'var(--r)' : 'var(--mut)';
+    if(!activeStrategy){
+      tag.textContent = 'Strategy: OFF';
+      tag.style.color = 'var(--mut)';
+    } else if(activeStrategy === 'utBot'){
+      tag.textContent = 'Strategy: UT Bot only signal trading';
+      tag.style.color = 'var(--acc)';
+    } else {
+      const ageMin = n.ts ? Math.max(0, Math.round((Date.now() - Number(n.ts)) / 60000)) : null;
+      const ageTxt = ageMin == null ? '' : ` | ${ageMin}m ago`;
+      tag.textContent = `News: ${(n.bias || 'neutral').toUpperCase()} (${Math.round(Number(n.score || 0))})${ageTxt}`;
+      tag.style.color = (n.bias === 'bullish') ? 'var(--g)' : (n.bias === 'bearish') ? 'var(--r)' : 'var(--mut)';
+    }
   }
 }
 function toggleStrategySwitch(name){
   if(!store.current) return;
   const st = getState();
-  st.strategySwitch = { nn: false, priceAction: true, newsFilter: true };
-  toast('PA + News strategy is locked ON in this file', 'info');
+  const currentStrategy = getActiveEntryStrategy(st);
+  const chosenStrategy = name === 'utBot' ? 'utBot' : 'priceAction';
+  const activeStrategy = currentStrategy === chosenStrategy ? '' : chosenStrategy;
+  st.entryStrategy = activeStrategy;
+  st.strategySwitch = {
+    nn: false,
+    priceAction: activeStrategy === 'priceAction',
+    utBot: activeStrategy === 'utBot',
+    newsFilter: activeStrategy === 'priceAction',
+  };
   syncStrategyUI();
   saveAll();
+  toast(!activeStrategy ? 'Strategy turned OFF' : activeStrategy === 'utBot' ? 'UT Bot strategy selected' : 'PA + News strategy selected', 'success');
+  try{ backendBotSync().then(updateBackendBotUI); }catch(e){}
 }
 
 function renderCooldown(){
@@ -1939,6 +2577,7 @@ function goBack(){
   store.current = null;
   document.getElementById('app').classList.add('hidden');
   document.getElementById('coinSelect').classList.remove('hidden');
+  updateProfileLabels();
 }
 
 async function selectCoin(sym){
@@ -1946,11 +2585,13 @@ async function selectCoin(sym){
     authSyncUI();
     return toast('Login first to unlock trading', 'error');
   }
+  updateProfileLabels();
   store.current = sym;
   const st = getState();
   st.tf = normalizeTf(st.tf);
   st.candlesByTf = createTfCandleMap(st.candlesByTf);
   st.enabledTf = createTfEnabledMap(st.enabledTf);
+  normalizeBotTradeTfInPlace(st);
 
   document.getElementById('coinSelect').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
@@ -1964,10 +2605,7 @@ async function selectCoin(sym){
     else { b.style.background='var(--bg3)'; b.style.color='var(--mut)'; }
   });
 
-  for(const tf of TF_LIST){
-    const btn = document.getElementById('tf_'+tf);
-    if(btn) btn.style.background = st.enabledTf[tf] ? 'var(--g)' : 'var(--r)';
-  }
+  syncEnabledTfButtons(st);
 
   document.getElementById('plText').textContent = st.profitLockEnabled ? 'Profit Lock: ON' : 'Profit Lock: OFF';
   syncAutoAdjustBtn();
@@ -2032,28 +2670,29 @@ async function selectCoin(sym){
 function setTf(tf, btn){
   const st = getState();
   const nextTf = normalizeTf(tf);
-  st.tf = nextTf;
+  normalizeBotTradeTfInPlace(st, nextTf);
   document.querySelectorAll('.tf').forEach(b=>{
     const t=b.dataset.tf;
-    if(t===nextTf){ b.style.background='var(--acc)'; b.style.color='white'; }
+    if(t===st.tf){ b.style.background='var(--acc)'; b.style.color='white'; }
     else { b.style.background='var(--bg3)'; b.style.color='var(--mut)'; }
   });
-  const candles = st.candlesByTf[nextTf] || [];
+  syncEnabledTfButtons(st);
+  const candles = st.candlesByTf[st.tf] || [];
   cs.setData(candles);
   updateMAs(candles);
   scrollLive();
   // recreate price lines ONLY for current chart timeframe
   setTimeout(()=>{ refreshChartLines(); }, 250);
   renderFromState();
+  saveAll();
+  if(st.botEnabled){
+    backendBotSync().catch(()=>{});
+  }
 }
 
 function toggleTf(tf){
-  const st=getState();
   if(!TF_LIST.includes(tf)) return;
-  st.enabledTf[tf] = !st.enabledTf[tf];
-  const btn = document.getElementById('tf_'+tf);
-  if(btn) btn.style.background = st.enabledTf[tf] ? 'var(--g)' : 'var(--r)';
-  saveAll();
+  setTf(tf);
 }
 
 /*********************
@@ -2321,10 +2960,14 @@ async function toggleBot(){
     return;
   }
   const shouldStart = !st.botEnabled;
+  const activeStrategy = getActiveEntryStrategy(st);
+  if(shouldStart && !activeStrategy){
+    toast('Pehle strategy ON karo', 'error');
+    return;
+  }
   st.botEnabled = shouldStart;
   clearBotAutoResume(st);
   DELTA.live = shouldStart;
-  st.strategySwitch = { nn: false, priceAction: true, newsFilter: true };
   syncBotBtn();
   toast(st.botEnabled?'Bot started':'Bot stopped', st.botEnabled?'success':'info');
   saveAll();
@@ -2363,6 +3006,7 @@ function buildBotSyncPayload(){
   const sym = store.current;
   if(!sym) return null;
   const st = getState();
+  const activeStrategy = getActiveEntryStrategy(st);
   const mode = deltaNormalizeMode(DELTA.mode);
   const creds = deltaActiveCreds();
   if(!creds.key || !creds.secret) return null;
@@ -2372,15 +3016,19 @@ function buildBotSyncPayload(){
     key: creds.key,
     secret: creds.secret,
     mode,
+    profile_name: PROFILE.name || '',
     bot_enabled: !!st.botEnabled,
     live_trading: !!DELTA.live,
     product_map: productMap,
     lot: deltaNormalizeLots(st.defaultLot || 1),
     sl_points: Number(st.baseSlPoints || 0),
     tp_points: Number(st.baseTpPoints || 0),
+    trade_tf: getBotTradeTf(st),
+    entry_strategy: activeStrategy,
     strategy_nn: false,
-    strategy_pa: true,
-    strategy_news: true,
+    strategy_pa: activeStrategy === 'priceAction',
+    strategy_ut: activeStrategy === 'utBot',
+    strategy_news: activeStrategy === 'priceAction',
     daily_trade_limit: getDailyTradeLimit(st),
     min_entry_gap_sec: 30 * 60,
     symbols: [sym],   // sync active symbol
@@ -2402,17 +3050,50 @@ async function backendBotSync(){
     if(!res.ok) return;
     const j = await res.json();
     if(!j?.ok) return;
-    // If backend has trades that we don't, show a toast
-    const backendTrades = j.trades || [];
     const st = getState();
-    if(backendTrades.length > 0 && (!st.trades || st.trades.length === 0)){
-      toast(`Backend bot has ${backendTrades.length} active trade(s) running`, 'info');
+    const historyBefore = Array.isArray(st?.history) ? st.history.length : 0;
+    const openBefore = Array.isArray(st?.trades) ? st.trades.length : 0;
+    const currentSym = String(store.current || '').toUpperCase();
+    const backendHistory = Array.isArray(j.history)
+      ? j.history.filter(item => String(item?.symbol || '').toUpperCase() === currentSym)
+      : [];
+    const backendTrades = Array.isArray(j.trades)
+      ? j.trades.filter(item => String(item?.symbol || '').toUpperCase() === currentSym)
+      : [];
+    if(backendHistory.length){
+      st.history = mergeTradeHistory(st.history, backendHistory, 'backend_bot_history');
+    }
+    const normalizedBackendTrades = normalizeTradeList(backendTrades, 'backend_bot_open').filter(item => !item.closed);
+    const backendOpenKeys = new Set(normalizedBackendTrades.map(item => item.syncKey));
+    st.trades = normalizeTradeList(st.trades, 'local').filter(trade => {
+      if(trade.syncSource !== 'backend_bot_open') return !trade.closed;
+      if(String(trade.symbol || '').toUpperCase() !== currentSym) return !trade.closed;
+      return backendOpenKeys.has(trade.syncKey);
+    });
+    if(normalizedBackendTrades.length){
+      st.trades = mergeOpenTrades(st.trades, normalizedBackendTrades, 'backend_bot_open');
+    }
+    if(normalizedBackendTrades.length > 0 && openBefore === 0){
+      toast(`Backend bot has ${normalizedBackendTrades.length} active trade(s) running`, 'info');
+    }
+    if(backendHistory.length && st.history.length > historyBefore){
+      refreshChartLines();
+      renderActive();
+      renderHistory();
+      renderStats();
+      saveAll();
+      toast(`${st.history.length - historyBefore} backend trade(s) synced`, 'info');
+    } else if(normalizedBackendTrades.length !== openBefore){
+      refreshChartLines();
+      renderActive();
+      saveAll();
     }
     // Sync demo balance from backend
-    if(j.demo_balance && deltaNormalizeMode(DELTA.mode) === 'demo'){
+    const demoBalance = Number(j.demo_balance);
+    if(Number.isFinite(demoBalance) && deltaNormalizeMode(DELTA.mode) === 'demo'){
       const sym = store.current;
       if(sym && store.coins[sym]){
-        store.coins[sym].availableBalance = j.demo_balance;
+        store.coins[sym].availableBalance = demoBalance;
         store.coins[sym].balanceSource = 'delta_demo';
         renderBalanceHeader();
       }
@@ -2430,7 +3111,7 @@ async function backendBotStop(){
     await fetch(base + '/bot/stop', {
       method: 'POST',
       headers: authHeaders({'Content-Type':'application/json'}),
-      body: JSON.stringify({ key: creds.key, secret: creds.secret, mode }),
+      body: JSON.stringify({ key: creds.key, secret: creds.secret, mode, profile_name: PROFILE.name || '' }),
     });
   }catch(e){}
 }
@@ -2463,12 +3144,12 @@ async function updateBackendBotUI(){
     const j = await res.json();
     const bots = j.bots || [];
     const mode = deltaNormalizeMode(DELTA.mode);
-    const creds = deltaActiveCreds();
-    const ak = bots.find(b => b.mode === mode);
+    const profileName = normalizeProfileName(PROFILE.name || '');
+    const ak = bots.find(b => b.mode === mode && normalizeProfileName(b?.profile_name || '') === profileName);
     if(ak && ak.bot_enabled){
       dot.style.background = 'var(--g)';
       const t = ak.trades?.length || 0;
-      status.textContent = `Running ✓ | ${t} trade(s) active | Bal: $${Number(ak.demo_balance||0).toFixed(2)}`;
+      status.textContent = `Running ✓ | ${profileName || 'No profile'} | ${t} trade(s) active | Bal: $${Number(ak.demo_balance||0).toFixed(2)}`;
     } else if(ak){
       dot.style.background = 'var(--y)';
       status.textContent = 'Synced, bot OFF (app closed?)';
@@ -2856,18 +3537,17 @@ function authHeaders(extra={}){
 
 function authSave(){
   try{
-    localStorage.setItem(CONFIG.AUTH_CACHE, JSON.stringify({
+    saveProfileSection('auth', {
       token: AUTH.token,
       userId: AUTH.userId,
-    }));
+    });
   }catch(e){}
 }
 
 function authLoad(){
   try{
-    const raw = localStorage.getItem(CONFIG.AUTH_CACHE);
-    if(!raw) return;
-    const data = JSON.parse(raw);
+    const data = loadProfileSection('auth', null);
+    if(!data) return;
     AUTH.token = String(data?.token || '');
     AUTH.userId = String(data?.userId || '');
   }catch(e){}
@@ -3141,14 +3821,14 @@ async function deltaLoadBackendCreds(mode, opts={}){
 
 function deltaLoad(){
   try{
-    const raw = localStorage.getItem(CONFIG.DELTA_CACHE);
-    if(raw){
-      const d = JSON.parse(raw);
+    resetDeltaState();
+    const d = loadProfileSection('delta', null);
+    if(d){
       DELTA.live = !!d.live;
       DELTA.proxy = d.proxy || '';
       DELTA.backend = deltaNormalizeBackendUrl(d.backend || DELTA.backend);
       DELTA.maxSlipPct = Math.max(0.1, Math.min(10, Number(d.maxSlipPct ?? DELTA.maxSlipPct ?? 1.0) || 1.0));
-      DELTA.bracket = (d.bracket !== false);
+      DELTA.bracket = ('bracket' in d) ? !!d.bracket : false;
       DELTA.mode = deltaNormalizeMode(d.mode || 'live');
       DELTA.ipInfo = d.ipInfo || null;
 
@@ -3168,7 +3848,7 @@ function deltaLoad(){
 }
 function deltaSave(){
   try{
-    localStorage.setItem(CONFIG.DELTA_CACHE, JSON.stringify({
+    saveProfileSection('delta', {
       mode: deltaNormalizeMode(DELTA.mode),
       creds: DELTA.creds,
       key: deltaGetModeCreds('live').key,
@@ -3183,7 +3863,7 @@ function deltaSave(){
       productMapByMode: DELTA.productMapByMode,
       productMap: deltaGetModeProductMap('live'),
       ipInfo: DELTA.ipInfo,
-    }));
+    });
   }catch(e){}
 }
 
@@ -3846,17 +4526,18 @@ function determineRegime(st){
   return {regime:'SIDEWAYS', ok:true, side:null, soft:true};
 }
 
-function noTradeFilters(st){
-  const s15 = st.sigByTf['15m'];
-  if(!s15) return {ok:false, why:'No 15m'};
+function noTradeFilters(st, tf=getBotTradeTf(st)){
+  const tradeTf = normalizeTf(tf);
+  const sig = st.sigByTf[tradeTf];
+  if(!sig) return {ok:false, why:`No ${tradeTf}`};
   const T = getTuning(st);
-  const atrPct = s15.price ? (s15.atr/s15.price*100) : 0;
+  const atrPct = sig.price ? (sig.atr/sig.price*100) : 0;
   if(atrPct>0 && atrPct < T.ATRPCT_MIN_15M) return {ok:false, why:'Low ATR (chop)'};
 
-  const c15 = st.candlesByTf['15m'];
-  if(c15.length<30) return {ok:false, why:'15m warmup'};
-  const last = c15[c15.length-1];
-  const atr = s15.atr||0;
+  const candles = st.candlesByTf[tradeTf];
+  if(candles.length<30) return {ok:false, why:`${tradeTf} warmup`};
+  const last = candles[candles.length-1];
+  const atr = sig.atr||0;
   const range = last.high-last.low;
   if(atr>0 && range > atr*2.8) return {ok:false, why:'Spike candle'};
   const body = Math.abs(last.close-last.open);
@@ -3865,7 +4546,7 @@ function noTradeFilters(st){
   if(body>0 && (wickTop+wickBot) > body*4) return {ok:false, why:'Wicky chop'};
 
   // low range cluster
-  const ranges = c15.slice(-10).map(c=>c.high-c.low);
+  const ranges = candles.slice(-10).map(c=>c.high-c.low);
   const avgR = ranges.reduce((a,b)=>a+b,0)/ranges.length;
   if(atr>0 && avgR < atr*0.55) return {ok:false, why:'Tight range'};
 
@@ -3891,15 +4572,16 @@ function triggerSignal(st, wantSide){
   return {ok:true};
 }
 
-function executionSignal(st, wantSide){
-  const c15 = st.candlesByTf['15m'];
-  if(c15.length<30) return {ok:false, why:'No 15m'};
-  const last = c15[c15.length-1];
+function executionSignal(st, wantSide, tf=getBotTradeTf(st)){
+  const tradeTf = normalizeTf(tf);
+  const candles = st.candlesByTf[tradeTf];
+  if(candles.length<30) return {ok:false, why:`No ${tradeTf}`};
+  const last = candles[candles.length-1];
   const isGreen = last.close>last.open;
-  const avgVol = c15.slice(-20).reduce((a,c)=>a+c.volume,0)/20;
+  const avgVol = candles.slice(-20).reduce((a,c)=>a+c.volume,0)/20;
   const volOk = last.volume > avgVol;
-  if(wantSide==='LONG' && (!isGreen || !volOk)) return {ok:false, why:'15m no confirmation'};
-  if(wantSide==='SHORT' && (isGreen || !volOk)) return {ok:false, why:'15m no confirmation'};
+  if(wantSide==='LONG' && (!isGreen || !volOk)) return {ok:false, why:`${tradeTf} no confirmation`};
+  if(wantSide==='SHORT' && (isGreen || !volOk)) return {ok:false, why:`${tradeTf} no confirmation`};
   return {ok:true};
 }
 
@@ -3934,22 +4616,23 @@ async function fetchNewsSentiment(sym){
   }
 }
 
-function priceActionSignal(st, regime){
-  const c15 = st.candlesByTf['15m'];
-  const s15 = st.sigByTf['15m'];
-  if(!Array.isArray(c15) || c15.length < 24 || !s15) return {ok:false, why:'PA warmup'};
-  const last = c15[c15.length - 1];
-  const prev = c15[c15.length - 2];
-  const highs = c15.slice(-13, -1).map(c => Number(c.high || 0));
-  const lows = c15.slice(-13, -1).map(c => Number(c.low || 0));
+function priceActionSignal(st, regime, tf=getBotTradeTf(st)){
+  const tradeTf = normalizeTf(tf);
+  const candles = st.candlesByTf[tradeTf];
+  const sig = st.sigByTf[tradeTf];
+  if(!Array.isArray(candles) || candles.length < 24 || !sig) return {ok:false, why:`PA ${tradeTf} warmup`};
+  const last = candles[candles.length - 1];
+  const prev = candles[candles.length - 2];
+  const highs = candles.slice(-13, -1).map(c => Number(c.high || 0));
+  const lows = candles.slice(-13, -1).map(c => Number(c.low || 0));
   const swingHigh = Math.max(...highs);
   const swingLow = Math.min(...lows);
-  const avgVol = c15.slice(-20).reduce((a, c) => a + Number(c.volume || 0), 0) / 20;
+  const avgVol = candles.slice(-20).reduce((a, c) => a + Number(c.volume || 0), 0) / 20;
   const volBoost = avgVol > 0 ? (Number(last.volume || 0) / avgVol) : 0;
   const range = Math.max(1e-9, Number(last.high || 0) - Number(last.low || 0));
   const body = Math.abs(Number(last.close || 0) - Number(last.open || 0));
   const bodyPower = body / range;
-  const adx = Number(s15.adx || 0);
+  const adx = Number(sig.adx || 0);
   if(adx < 16) return {ok:false, why:'PA adx low'};
   if(volBoost < 1.1) return {ok:false, why:'PA volume low'};
   if(bodyPower < 0.55) return {ok:false, why:'PA body weak'};
@@ -3964,10 +4647,10 @@ function priceActionSignal(st, regime){
   return {ok:true, side, quality, why:'PA breakout'};
 }
 
-function combinedAlgoSignal(st, regime, pa, news){
-  const s15 = st?.sigByTf?.['15m'];
-  const s30 = st?.sigByTf?.['30m'];
-  if(!s15 || !s30) return { ok:false, why:'warmup' };
+function combinedAlgoSignal(st, regime, pa, news, tf=getBotTradeTf(st)){
+  const tradeTf = normalizeTf(tf);
+  const sig = st?.sigByTf?.[tradeTf];
+  if(!sig) return { ok:false, why:`${tradeTf} warmup` };
 
   const newsBias = String(news?.bias || 'neutral').toLowerCase();
   const newsScore = Math.abs(Number(news?.score || 0));
@@ -4002,9 +4685,9 @@ function combinedAlgoSignal(st, regime, pa, news){
   if(!side) return { ok:false, why:'no combined signal' };
   if(regimeSide && regimeSide !== side) return { ok:false, why:'30m trend mismatch' };
 
-  const diff = Math.abs(Number(s15.buy || 0) - Number(s15.sell || 0));
-  const trendOk = side === 'LONG' ? Number(s15.buy || 0) >= Number(s15.sell || 0) : Number(s15.sell || 0) >= Number(s15.buy || 0);
-  if(!trendOk && newsScore < 24) return { ok:false, why:'15m score mismatch' };
+  const diff = Math.abs(Number(sig.buy || 0) - Number(sig.sell || 0));
+  const trendOk = side === 'LONG' ? Number(sig.buy || 0) >= Number(sig.sell || 0) : Number(sig.sell || 0) >= Number(sig.buy || 0);
+  if(!trendOk && newsScore < 24) return { ok:false, why:`${tradeTf} score mismatch` };
   quality += Math.min(10, diff / 4);
 
   return {
@@ -4121,7 +4804,9 @@ function openTradeWithConfig(cfg){
     lockSL: null,
     maxProfitINR: 0,
     maxLossINR: 0,
+    syncSource: 'local',
     entryTime: Date.now(),
+    entryCandleTime: Number(st.lastClosedCandleByTf?.[tf] || 0),
     autoCloseAt: null,
   };
 
@@ -4389,27 +5074,36 @@ async function runBot(){
   if(!st.botEnabled) return;
   if(tradeCooldownActive(st)) return;
   if(!canOpenNewTradeToday(st)) return;
+  const tradeTf = getBotTradeTf(st);
+  if(!st.enabledTf?.[tradeTf]) return;
+  if(timeframeTradeExists(tradeTf)) return;
+  const activeStrategy = getActiveEntryStrategy(st);
+  if(!activeStrategy) return;
+
+  if(activeStrategy === 'utBot'){
+    const candles = st.candlesByTf?.[tradeTf] || [];
+    const selected = utBotSignal(candles);
+    syncStrategyUI();
+    if(!selected?.ok || !selected.side) return;
+    if(String(selected.signal || 'WAIT') === 'WAIT') return;
+    executeTrade(selected.side, selected.strategy || selected.why || 'UT Bot Alerts', tradeTf);
+    return;
+  }
 
   const regime = determineRegime(st);
-  const pa = priceActionSignal(st, regime);
+  const pa = priceActionSignal(st, regime, tradeTf);
   const news = await fetchNewsSentiment(store.current);
   st.newsSentiment = news;
   syncStrategyUI();
 
-  const selected = combinedAlgoSignal(st, regime, pa, news);
+  const selected = combinedAlgoSignal(st, regime, pa, news, tradeTf);
   if(!selected) return;
   if(!selected.ok) return;
   if(Number(selected.quality || 0) < 75) return;
-
-  for(const tf of TF_LIST){
-    if(!st.enabledTf[tf]) continue;
-    if(timeframeTradeExists(tf)) continue;
-    if(!canOpenNewTradeToday(st)) return;
-    if(regime.soft && tf==='30m') continue;
-    const ex = selected.why.includes('strong') ? { ok: true } : executionSignal(st, selected.side);
-    if(!ex.ok) continue;
-    executeTrade(selected.side, `${selected.strategy} (${selected.why})`, tf);
-  }
+  if(regime.soft && tradeTf==='30m') return;
+  const ex = selected.why.includes('strong') ? { ok: true } : executionSignal(st, selected.side, tradeTf);
+  if(!ex.ok) return;
+  executeTrade(selected.side, `${selected.strategy} (${selected.why})`, tradeTf);
 }
 
 /*********************
@@ -4521,7 +5215,104 @@ function markerPriceAction(candles, sig, regime){
   const quality = Math.round(Math.min(99, Math.max(50, 58 + Number(sig.adx||0) + (volBoost*10) + (bodyPower*12))));
   return {side, quality};
 }
+function utBotSignal(candles, keyValue=1.0, atrPeriod=10){
+  const period = Math.max(1, Number(atrPeriod) || 10);
+  const mult = Math.max(0.1, Number(keyValue) || 1.0);
+  if(!Array.isArray(candles) || candles.length < period + 3){
+    return { ok:false, signal:'WAIT', side:null, bias:null, trailingStop:null, atr:0, price:0, quality:0, why:'UT warmup', strategy:'UT Bot Alerts' };
+  }
+  const trs = [];
+  for(let i=0;i<candles.length;i++){
+    const c = candles[i] || {};
+    const prev = candles[i-1] || c;
+    const high = Number(c.high || 0);
+    const low = Number(c.low || 0);
+    const prevClose = Number(prev.close || c.close || 0);
+    trs.push(Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose)));
+  }
+  let trailingStop = 0;
+  let lastAtr = 0;
+  let latestSignal = 'WAIT';
+  let latestSide = null;
+  let bias = null;
+  for(let i=0;i<candles.length;i++){
+    const candle = candles[i] || {};
+    const src = Number(candle.close || 0);
+    const prevCandle = candles[i-1] || candle;
+    const prevSrc = Number(prevCandle.close || src);
+    const atrWindow = trs.slice(Math.max(0, i - period + 1), i + 1);
+    const atrNow = atrWindow.reduce((a, b) => a + Number(b || 0), 0) / Math.max(1, atrWindow.length);
+    const nLoss = mult * atrNow;
+    const prevStop = i > 0 ? trailingStop : 0;
+    if(i === 0){
+      trailingStop = src - nLoss;
+    } else if(src > prevStop && prevSrc > prevStop){
+      trailingStop = Math.max(prevStop, src - nLoss);
+    } else if(src < prevStop && prevSrc < prevStop){
+      trailingStop = Math.min(prevStop, src + nLoss);
+    } else if(src > prevStop){
+      trailingStop = src - nLoss;
+    } else {
+      trailingStop = src + nLoss;
+    }
+    const buy = i > 0 && src > trailingStop && prevSrc <= prevStop;
+    const sell = i > 0 && src < trailingStop && prevSrc >= prevStop;
+    if(i === candles.length - 1){
+      latestSignal = buy ? 'BUY' : (sell ? 'SELL' : 'WAIT');
+      latestSide = buy ? 'LONG' : (sell ? 'SHORT' : null);
+    }
+    lastAtr = atrNow;
+    bias = src >= trailingStop ? 'LONG' : 'SHORT';
+  }
+  const price = Number(candles[candles.length - 1]?.close || 0);
+  const distAtr = lastAtr > 0 ? Math.abs(price - trailingStop) / lastAtr : 0;
+  const qualityFloor = latestSide ? 78 : 58;
+  const quality = Math.round(Math.min(99, Math.max(qualityFloor, 68 + distAtr * 12)));
+  return {
+    ok: true,
+    signal: latestSignal,
+    side: latestSide,
+    bias,
+    trailingStop,
+    atr: lastAtr,
+    price,
+    quality,
+    why: latestSide ? `UT ${latestSignal}` : `UT bias ${bias || '--'}`,
+    strategy: 'UT Bot Alerts',
+  };
+}
+function buildHistoricalUtMarkers(st, tf){
+  const candles = st?.candlesByTf?.[tf] || [];
+  if(candles.length < 30) return [];
+  const out = [];
+  const sec = TF_SEC[tf] || TF_SEC[DEFAULT_TF];
+  let lastSide = '';
+  let lastTime = 0;
+  const start = Math.max(12, candles.length - 1200);
+  for(let i=start;i<candles.length;i++){
+    const slice = candles.slice(Math.max(0, i - 260), i + 1);
+    const sig = utBotSignal(slice);
+    if(!sig?.ok || !sig?.side || sig.signal === 'WAIT') continue;
+    const candleTime = Number(candles[i]?.time || 0);
+    if(sig.side === lastSide && (candleTime - lastTime) < sec * 2) continue;
+    lastSide = sig.side;
+    lastTime = candleTime;
+    out.push({
+      time: candleTime,
+      position: sig.side === 'LONG' ? 'belowBar' : 'aboveBar',
+      color: sig.side === 'LONG' ? '#22c55e' : '#ef4444',
+      shape: sig.side === 'LONG' ? 'arrowUp' : 'arrowDown',
+      text: `${sig.side === 'LONG' ? 'BUY' : 'SELL'} ${tf}`,
+    });
+  }
+  return out.slice(-220);
+}
 function buildHistoricalSignalMarkers(st, tf){
+  const activeStrategy = getActiveEntryStrategy(st);
+  if(!activeStrategy) return [];
+  if(activeStrategy === 'utBot'){
+    return buildHistoricalUtMarkers(st, tf);
+  }
   const candles = st?.candlesByTf?.[tf] || [];
   if(candles.length < 80) return [];
   const c30 = st?.candlesByTf?.['30m'] || [];
@@ -4576,18 +5367,38 @@ function refreshTradeMarkers(){
   const tf = normalizeTf(st.tf);
   const sec = TF_SEC[tf] || TF_SEC[DEFAULT_TF];
   const candles = st.candlesByTf?.[tf] || [];
-  const knownTimes = new Set(candles.map(c=>Number(c.time)));
-  const lastTime = candles.length ? Number(candles[candles.length-1].time) : null;
   const signalMarkers = buildHistoricalSignalMarkers(st, tf);
-  const tradeMarkers = st.trades.map(trade => {
-    let time = Math.floor((Number(trade.entryTime || Date.now()) / 1000) / sec) * sec;
-    if(!knownTimes.has(time) && Number.isFinite(lastTime)) time = lastTime;
+  const tradeMap = new Map();
+  normalizeTradeList(st.history, 'local').forEach(trade => tradeMap.set(trade.syncKey, trade));
+  normalizeTradeList(st.trades, 'local').forEach(trade => tradeMap.set(trade.syncKey, trade));
+  const tradeMarkers = Array.from(tradeMap.values()).map(trade => {
+    let targetTime = Number(trade.entryCandleTime || 0);
+    if(!Number.isFinite(targetTime) || targetTime <= 0){
+      targetTime = Math.floor((Number(trade.entryTime || 0) / 1000) / sec) * sec;
+    }
+    if((!Number.isFinite(targetTime) || targetTime <= 0) && candles.length){
+      targetTime = Number(candles[candles.length-1].time);
+    }
+    let time = targetTime;
+    if(candles.length && (!Number.isFinite(time) || !candles.some(c => Number(c.time) === time))){
+      let nearest = Number(candles[0].time);
+      let bestDiff = Math.abs(nearest - targetTime);
+      for(const candle of candles){
+        const candleTime = Number(candle.time);
+        const diff = Math.abs(candleTime - targetTime);
+        if(diff < bestDiff){
+          nearest = candleTime;
+          bestDiff = diff;
+        }
+      }
+      time = nearest;
+    }
     return {
       time,
       position: trade.side === 'LONG' ? 'belowBar' : 'aboveBar',
       color: trade.side === 'LONG' ? '#22c55e' : '#ef4444',
       shape: trade.side === 'LONG' ? 'arrowUp' : 'arrowDown',
-      text: `${trade.side} ${trade.tf}`,
+      text: `${trade.side === 'LONG' ? 'BUY' : 'SELL'} ${trade.tf}`,
     };
   }).filter(marker => Number.isFinite(marker.time));
   const markers = [...signalMarkers, ...tradeMarkers].sort((a,b)=>Number(a.time)-Number(b.time));
@@ -4711,6 +5522,7 @@ function renderActive(){
     return;
   }
 
+  
   box.innerHTML = st.trades.map((t, idx)=>{
     const symSt = store.coins[t.symbol] || st;
     const price = symSt.price || symSt.candlesByTf[t.tf]?.at(-1)?.close || t.entry;
@@ -4813,6 +5625,7 @@ function renderStats(){
 }
 
 function renderAll(){
+  updateProfileLabels();
   renderActive();
   renderHistory();
   renderStats();
@@ -4836,7 +5649,19 @@ function renderFromState(){
     document.getElementById('sellBar').style.width = (sig.sell/total*100)+'%';
 
     const rec = document.getElementById('rec');
-    if(sig.buy>sig.sell){ rec.textContent = 'BUY'; rec.style.background='rgba(34,197,94,.15)'; rec.style.color='var(--g)'; }
+    const activeStrategy = getActiveEntryStrategy(st);
+    if(!activeStrategy){
+      rec.textContent = 'OFF';
+      rec.style.background='rgba(107,114,128,.2)';
+      rec.style.color='var(--mut)';
+    } else if(activeStrategy === 'utBot'){
+      const ut = utBotSignal(st.candlesByTf?.[st.tf] || []);
+      if(ut?.side === 'LONG'){ rec.textContent = 'UT BUY'; rec.style.background='rgba(34,197,94,.15)'; rec.style.color='var(--g)'; }
+      else if(ut?.side === 'SHORT'){ rec.textContent = 'UT SELL'; rec.style.background='rgba(239,68,68,.15)'; rec.style.color='var(--r)'; }
+      else if(ut?.bias === 'LONG'){ rec.textContent = 'UT LONG'; rec.style.background='rgba(34,197,94,.10)'; rec.style.color='var(--g)'; }
+      else if(ut?.bias === 'SHORT'){ rec.textContent = 'UT SHORT'; rec.style.background='rgba(239,68,68,.10)'; rec.style.color='var(--r)'; }
+      else { rec.textContent = 'UT WAIT'; rec.style.background='rgba(107,114,128,.2)'; rec.style.color='var(--mut)'; }
+    } else if(sig.buy>sig.sell){ rec.textContent = 'BUY'; rec.style.background='rgba(34,197,94,.15)'; rec.style.color='var(--g)'; }
     else if(sig.sell>sig.buy){ rec.textContent = 'SELL'; rec.style.background='rgba(239,68,68,.15)'; rec.style.color='var(--r)'; }
     else { rec.textContent = 'WAIT'; rec.style.background='rgba(107,114,128,.2)'; rec.style.color='var(--mut)'; }
   }
@@ -4963,29 +5788,34 @@ function renderFromState(){
   if(bs){
     if(!st.botEnabled) bs.textContent='Bot is idle';
     else {
-      const f = noTradeFilters(st);
+      const tradeTf = getBotTradeTf(st);
+      const activeStrategy = getActiveEntryStrategy(st);
+      if(!activeStrategy){
+        bs.textContent = `[EXEC: OFF | TF ${tradeTf}] Select strategy first`;
+        return;
+      }
+      if(activeStrategy === 'utBot'){
+        const ut = utBotSignal(st.candlesByTf?.[tradeTf] || []);
+        const trailTxt = Number.isFinite(Number(ut?.trailingStop)) ? `Stop ${Number(ut.trailingStop).toFixed(2)}` : 'warming up';
+        const biasTxt = ut?.side ? `${ut.signal} ready` : (ut?.bias ? `Bias ${ut.bias}` : 'warming up');
+        bs.textContent = `[EXEC: UT Bot | TF ${tradeTf}] ${trailTxt} | ${biasTxt}`;
+        return;
+      }
+      const f = noTradeFilters(st, tradeTf);
       const rg = determineRegime(st);
-      const nn = st.nnByTf['15m'];
-      const t15 = st.sigByTf['15m'];
-      const diff15 = t15 ? Math.abs((t15.buy||0)-(t15.sell||0)) : null;
-      const setupDisp = setupSignal(st);
+      const sigTf = st.sigByTf[tradeTf];
+      const diffTf = sigTf ? Math.abs((sigTf.buy||0)-(sigTf.sell||0)) : null;
 
       let why = '';
       if(!rg.ok) why = 'Regime not ready';
       else if(!f.ok) why = `Filter: ${f.why}`;
-      else if(!nn) why = 'NN15 missing';
-      else if(!rg.soft && (nn.dir==='UP'?'LONG':'SHORT') !== rg.side) why = 'NN15 not aligned with 30m regime';
-      else if(rg.soft && nn.conf < 60) why = 'Sideways: need NN15 >=60%';
-      else if(!t15) why = '15m missing';
-      else if(diff15!==null && diff15 < CONFIG.DIFF_MIN) why = `Weak diff (15m ${diff15.toFixed(0)})`;
+      else if(!sigTf) why = `${tradeTf} missing`;
+      else if(diffTf!==null && diffTf < CONFIG.DIFF_MIN) why = `Weak diff (${tradeTf} ${diffTf.toFixed(0)})`;
       else why = 'Ready';
 
-      // Always compute BOTH decision snapshots (display), execute uses selected mode.
-      const yourSide = (nn && nn.dir==='DOWN' && nn.conf>60) ? 'SHORT' : (nn? 'LONG' : '--');
-      const proSide = (setupDisp && setupDisp.ok) ? setupDisp.dir : '--';
-
-      const modeTag = `EXEC: AUTO (Pro + Your NN)${st.strictMode?' (Strict)':' (Less-Strict)'}`;
-      const msg = `[${modeTag}] Regime ${rg.regime}${rg.soft?' (soft)':''} | NN15 ${nn?nn.dir:''} ${nn?nn.conf:''}% | YourNN->${yourSide} | ProMTF->${proSide} | ${why}`;
+      const modeTag = `EXEC: PA + News | TF ${tradeTf}${st.strictMode?' | Strict':' | Less-Strict'}`;
+      const scoreTxt = sigTf ? `BUY ${Math.round(sigTf.buy||0)} / SELL ${Math.round(sigTf.sell||0)}` : 'warming up';
+      const msg = `[${modeTag}] Regime ${rg.regime}${rg.soft?' (soft)':''} | ${scoreTxt} | ${why}`;
       bs.textContent = msg;
     }
   }
@@ -5042,10 +5872,10 @@ async function trainNow(){
   st.nnTrain.trained = true;
   st.nnTrain.patterns = total;
 
-  localStorage.setItem(CONFIG.TRAIN_CACHE, JSON.stringify({
-    ...(JSON.parse(localStorage.getItem(CONFIG.TRAIN_CACHE) || '{}')),
-    [sym]: st.nnTrain
-  }));
+  saveProfileSection('train', {
+    ...(loadProfileSection('train', {}) || {}),
+    [sym]: st.nnTrain,
+  });
 
   if(btn){
     btn.textContent = prevText || `Train (${TARGET})`;
@@ -5399,17 +6229,13 @@ function resetBalance(){
 /*********************
  * Boot
  *********************/
-loadAll();
-deltaLoad();
-deltaLoadBackendCreds(deltaNormalizeMode(DELTA.mode), { silent:true });
-deltaQueueAutoConnect(900);
-authBootstrap();
+getProfileRoot();
+resetStoreState();
+resetDeltaState();
+resetAuthState();
 startPriceFeed();
 
-setTimeout(()=>{
-  document.getElementById('splash').classList.add('hidden');
-  document.getElementById('coinSelect').classList.remove('hidden');
-}, 1200);
+setTimeout(showInitialScreen, 1200);
 
 // main loop: 1s
 setInterval(async ()=>{
@@ -5428,21 +6254,17 @@ setInterval(async ()=>{
     // run trade management always (SL/TP/lock)
     updateTrades();
 
-    // run bot only if any timeframe closed since last evaluation
-    let anyNewClose = false;
-    for(const tf of TF_LIST){
-      const lastC = st.lastClosedCandleByTf[tf] || 0;
-      const lastE = st.lastEvaluatedClosedByTf[tf] || 0;
-      if(lastC && lastC !== lastE){ anyNewClose = true; break; }
-    }
-    if(anyNewClose){
+    // run bot only when the selected trade timeframe closes
+    const tradeTf = getBotTradeTf(st);
+    const lastC = st.lastClosedCandleByTf[tradeTf] || 0;
+    const lastE = st.lastEvaluatedClosedByTf[tradeTf] || 0;
+    if(lastC && lastC !== lastE){
       await runBot();
-      for(const tf of TF_LIST){
-        const lastC = st.lastClosedCandleByTf[tf] || 0;
-        if(lastC) st.lastEvaluatedClosedByTf[tf] = lastC;
-      }
+      st.lastEvaluatedClosedByTf[tradeTf] = lastC;
       // mark 15m flip evaluation point (prevents repeated flips on same candle)
-      st.lastFlipEval15m = st.lastClosedCandleByTf?.['15m'] || st.lastFlipEval15m || 0;
+      if(tradeTf === '15m'){
+        st.lastFlipEval15m = st.lastClosedCandleByTf?.['15m'] || st.lastFlipEval15m || 0;
+      }
     }
     maybeRunPendingFlip();
     await instantMaybeRunAuto();
