@@ -1908,6 +1908,16 @@ def get_last_closed_candle(candles: list[dict], tf: str) -> int:
     return 0
 
 
+def closed_signal_candles(candles: list[dict], closed_time: int) -> list[dict]:
+    if not candles:
+        return []
+    if closed_time > 0:
+        filtered = [c for c in candles if int(c.get("time", 0)) <= closed_time]
+        if filtered:
+            return filtered
+    return candles[:-1] if len(candles) > 1 else list(candles)
+
+
 def bot_daily_counter(state: dict[str, Any]) -> dict[str, Any]:
     c = state.setdefault("daily_trade_counter", {"day": "", "count": 0})
     day = utc_day_key()
@@ -2051,6 +2061,117 @@ def bot_run_symbol(state: dict, symbol: str) -> None:
     contract_qty = DELTA_CONTRACT_VALUE.get(symbol, 0.01)
     qty = lot * contract_qty
 
+    def close_active_trade(trade: dict[str, Any], reason: str, *, apply_cooldown: bool = True) -> None:
+        is_long = trade.get("side") == "LONG"
+        entry_p = float(trade.get("entry", price))
+        raw_pnl = (price - entry_p) * qty if is_long else (entry_p - price) * qty
+        fee = bot_calc_fee(entry_p, price, qty)
+        net_pnl = raw_pnl - fee
+
+        if live_trading:
+            exc_side = "buy" if trade.get("side") == "LONG" else "sell"
+            bot_close_trade_on_exchange(key, secret, mode, product_id, exc_side, lot)
+
+        closed_trade = {
+            **trade,
+            "closed": True,
+            "exit": price,
+            "exit_time": utc_now(),
+            "reason": reason,
+            "pnl_usd": round(net_pnl, 4),
+            "fee_paid": round(fee, 4),
+        }
+        history = state.setdefault("history", [])
+        history.insert(0, closed_trade)
+        del history[250:]
+
+        current_balance = float(state.get("demo_balance", 1000.0))
+        state["demo_balance"] = max(0.0, current_balance + net_pnl)
+
+        record_trade_event(
+            reason,
+            mode,
+            product_id,
+            side=trade.get("side"),
+            symbol=symbol,
+            entry=entry_p,
+            exit=price,
+            entry_time=trade.get("entry_time"),
+            exit_time=closed_trade.get("exit_time"),
+            strategy=trade.get("strategy"),
+            tf=trade.get("tf"),
+            pnl_usd=round(net_pnl, 4),
+        )
+        add_log("bot_close", symbol=symbol, reason=reason, price=price, pnl=round(net_pnl, 4))
+        if apply_cooldown:
+            state["last_close_time"] = time.time()
+        trade["closed"] = True
+        trades[:] = [t for t in trades if not t.get("closed")]
+
+    def open_trade(side: str, strategy: str, entry_candle_time: int, sig_ctx: dict[str, Any]) -> bool:
+        if side not in {"LONG", "SHORT"}:
+            return False
+        if live_trading and bot_check_position_open(key, secret, mode, symbol):
+            return False
+
+        entry = price
+        sl, tp = bot_sl_tp(
+            symbol,
+            side,
+            entry,
+            sl_points,
+            tp_points,
+            tf=trade_tf,
+            atr=to_float(sig_ctx.get("atr"), 0.0),
+            adx=to_float(sig_ctx.get("adx"), 0.0),
+        )
+
+        if live_trading:
+            exc_side = "buy" if side == "LONG" else "sell"
+            ok = bot_place_order(key, secret, mode, product_id, exc_side, lot, sl, tp)
+            if not ok:
+                add_log("bot_order_failed", symbol=symbol, side=side)
+                return False
+
+        new_trade = {
+            "id": int(time.time() * 1000),
+            "symbol": symbol,
+            "side": side,
+            "entry": entry,
+            "sl": sl,
+            "tp": tp,
+            "lot": lot,
+            "qty": qty,
+            "qtyBase": qty,
+            "entry_time": utc_now(),
+            "entry_time_ms": int(time.time() * 1000),
+            "entry_candle_time": entry_candle_time,
+            "closed": False,
+            "strategy": strategy,
+            "tf": trade_tf,
+        }
+        trades.append(new_trade)
+        bot_mark_open_today(state)
+        state["last_trade_time"] = time.time()
+        state[f"last_entry_time_{symbol}_{trade_tf}"] = time.time()
+        state[f"last_entry_candle_{symbol}_{trade_tf}"] = entry_candle_time
+        add_log("bot_open", symbol=symbol, side=side, entry=entry, sl=sl, tp=tp, strategy=strategy)
+        return True
+
+    candles_trade: list[dict] = []
+    last_closed_trade = 0
+    ut_signal_candles: list[dict] = []
+    ut_sig15: dict[str, Any] | None = None
+    ut_selected: dict[str, Any] | None = None
+    if bot_enabled and entry_strategy == "utBot":
+        candles_trade = bot_fetch_candles(mode, symbol, trade_tf, 120)
+        if len(candles_trade) >= 60:
+            last_closed_trade = get_last_closed_candle(candles_trade, trade_tf)
+            ut_signal_candles = closed_signal_candles(candles_trade, last_closed_trade)
+            if len(ut_signal_candles) >= 60:
+                ut_sig15 = compute_signals(ut_signal_candles)
+                ut_selected = bot_ut_bot_signal(ut_signal_candles)
+
     if active:
         is_long = active.get("side") == "LONG"
         sl = float(active.get("sl", 0))
@@ -2070,56 +2191,33 @@ def bot_run_symbol(state: dict, symbol: str) -> None:
                     reason = "TP Hit"
 
         if reason:
-            entry_p = float(active.get("entry", price))
-            raw_pnl = (price - entry_p) * qty if is_long else (entry_p - price) * qty
-            fee = bot_calc_fee(entry_p, price, qty)
-            net_pnl = raw_pnl - fee
-
-            if live_trading:
-                exc_side = "buy" if active.get("side") == "LONG" else "sell"
-                bot_close_trade_on_exchange(key, secret, mode, product_id, exc_side, lot)
-
-            closed_trade = {
-                **active,
-                "closed": True,
-                "exit": price,
-                "exit_time": utc_now(),
-                "reason": reason,
-                "pnl_usd": round(net_pnl, 4),
-                "fee_paid": round(fee, 4),
-            }
-            history = state.setdefault("history", [])
-            history.insert(0, closed_trade)
-            del history[250:]
-
-            current_balance = float(state.get("demo_balance", 1000.0))
-            state["demo_balance"] = max(0.0, current_balance + net_pnl)
-
-            record_trade_event(
-                reason,
-                mode,
-                product_id,
-                side=active.get("side"),
-                symbol=symbol,
-                entry=entry_p,
-                exit=price,
-                entry_time=active.get("entry_time"),
-                exit_time=closed_trade.get("exit_time"),
-                strategy=active.get("strategy"),
-                tf=active.get("tf"),
-                pnl_usd=round(net_pnl, 4),
-            )
-            add_log("bot_close", symbol=symbol, reason=reason, price=price, pnl=round(net_pnl, 4))
-            state["last_close_time"] = time.time()
-            active["closed"] = True
-            trades[:] = [t for t in trades if not t.get("closed")]
+            close_active_trade(active, reason, apply_cooldown=True)
             return
+
+        if (
+            bot_enabled
+            and entry_strategy == "utBot"
+            and last_closed_trade > 0
+            and ut_selected
+            and ut_selected.get("ok")
+            and ut_selected.get("side")
+            and str(ut_selected.get("signal") or "WAIT") in {"BUY", "SELL"}
+        ):
+            entry_candle_time = int(active.get("entry_candle_time", 0) or 0)
+            next_side = str(ut_selected.get("side") or "")
+            if entry_candle_time != last_closed_trade and next_side in {"LONG", "SHORT"} and next_side != str(active.get("side") or ""):
+                close_reason = f"UT Flip ({trade_tf} close): {ut_selected.get('signal')}"
+                close_active_trade(active, close_reason, apply_cooldown=False)
+                open_trade(next_side, "UT Bot Alerts", last_closed_trade, ut_sig15 or {})
+                return
+
+        return
 
     last_close = float(state.get("last_close_time", 0))
     if time.time() - last_close < TRADE_COOLDOWN_SEC:
         return
 
-    if not bot_enabled or active:
+    if not bot_enabled:
         return
     if not bot_can_open_today(state):
         return
@@ -2127,41 +2225,53 @@ def bot_run_symbol(state: dict, symbol: str) -> None:
     if (time.time() - last_entry_time) < min_entry_gap_sec:
         return
 
-    candles_trade = bot_fetch_candles(mode, symbol, trade_tf, 120)
-    candles_30 = candles_trade if trade_tf == "30m" else bot_fetch_candles(mode, symbol, "30m", 120)
-    if len(candles_trade) < 60 or len(candles_30) < 60:
+    if not candles_trade:
+        candles_trade = bot_fetch_candles(mode, symbol, trade_tf, 120)
+    if len(candles_trade) < 60:
         return
-
-    last_closed_trade = get_last_closed_candle(candles_trade, trade_tf)
+    if last_closed_trade == 0:
+        last_closed_trade = get_last_closed_candle(candles_trade, trade_tf)
     last_entry_candle = int(state.get(f"last_entry_candle_{symbol}_{trade_tf}", 0))
     if last_closed_trade == 0 or last_closed_trade == last_entry_candle:
         return
 
-    sig15 = compute_signals(candles_trade)
-    sig30 = compute_signals(candles_30)
-    news = fetch_news_sentiment(symbol) if strategy_news else {"bias": "neutral", "score": 0}
-
     if entry_strategy == "utBot":
-        selected = bot_ut_bot_signal(candles_trade)
+        if not ut_signal_candles:
+            ut_signal_candles = closed_signal_candles(candles_trade, last_closed_trade)
+        if len(ut_signal_candles) < 60:
+            return
+        sig15 = ut_sig15 or compute_signals(ut_signal_candles)
+        selected = ut_selected or bot_ut_bot_signal(ut_signal_candles)
         if not selected.get("ok") or not selected.get("side"):
+            return
+        if str(selected.get("signal") or "WAIT") not in {"BUY", "SELL"}:
             return
         side = str(selected.get("side") or "")
         strategy = "UT Bot Alerts"
         exc = {"ok": True}
-    elif entry_strategy == "nn":
-        selected = bot_nn_entry_signal(candles_trade, sig15, sig30, strict)
-        if not selected.get("ok") or to_float(selected.get("quality"), 0.0) < 75:
-            return
-        side = str(selected.get("side") or "")
-        strategy = str(selected.get("strategy") or "AI Neural (Pro)")
-        exc = {"ok": True}
+        news = fetch_news_sentiment(symbol) if strategy_news else {"bias": "neutral", "score": 0}
     else:
-        selected = bot_price_action_entry_signal(candles_trade, sig15, sig30, strict)
-        if not selected.get("ok") or to_float(selected.get("quality"), 0.0) < 75:
+        candles_30 = candles_trade if trade_tf == "30m" else bot_fetch_candles(mode, symbol, "30m", 120)
+        if len(candles_30) < 60:
             return
-        side = str(selected.get("side") or "")
-        strategy = str(selected.get("strategy") or "Price Action (Breakout)")
-        exc = execution_signal(candles_trade, side)
+        sig15 = compute_signals(candles_trade)
+        sig30 = compute_signals(candles_30)
+        news = fetch_news_sentiment(symbol) if strategy_news else {"bias": "neutral", "score": 0}
+        if entry_strategy == "nn":
+            selected = bot_nn_entry_signal(candles_trade, sig15, sig30, strict)
+            if not selected.get("ok") or to_float(selected.get("quality"), 0.0) < 75:
+                return
+            side = str(selected.get("side") or "")
+            strategy = str(selected.get("strategy") or "AI Neural (Pro)")
+            exc = {"ok": True}
+        else:
+            selected = bot_price_action_entry_signal(candles_trade, sig15, sig30, strict)
+            if not selected.get("ok") or to_float(selected.get("quality"), 0.0) < 75:
+                return
+            side = str(selected.get("side") or "")
+            strategy = str(selected.get("strategy") or "Price Action (Breakout)")
+            exc = execution_signal(candles_trade, side)
+
     if side not in {"LONG", "SHORT"}:
         return
     if strategy_news and not bot_news_allows(side, news):
@@ -2169,42 +2279,7 @@ def bot_run_symbol(state: dict, symbol: str) -> None:
     if not exc.get("ok"):
         return
 
-    if live_trading and bot_check_position_open(key, secret, mode, symbol):
-        return
-
-    entry = price
-    sl, tp = bot_sl_tp(symbol, side, entry, sl_points, tp_points, tf=trade_tf, atr=sig15.get("atr", 0), adx=sig15.get("adx", 0))
-
-    if live_trading:
-        exc_side = "buy" if side == "LONG" else "sell"
-        ok = bot_place_order(key, secret, mode, product_id, exc_side, lot, sl, tp)
-        if not ok:
-            add_log("bot_order_failed", symbol=symbol, side=side)
-            return
-
-    new_trade = {
-        "id": int(time.time() * 1000),
-        "symbol": symbol,
-        "side": side,
-        "entry": entry,
-        "sl": sl,
-        "tp": tp,
-        "lot": lot,
-        "qty": qty,
-        "qtyBase": qty,
-        "entry_time": utc_now(),
-        "entry_time_ms": int(time.time() * 1000),
-        "entry_candle_time": last_closed_trade,
-        "closed": False,
-        "strategy": strategy,
-        "tf": trade_tf,
-    }
-    trades.append(new_trade)
-    bot_mark_open_today(state)
-    state["last_trade_time"] = time.time()
-    state[f"last_entry_time_{symbol}_{trade_tf}"] = time.time()
-    state[f"last_entry_candle_{symbol}_{trade_tf}"] = last_closed_trade
-    add_log("bot_open", symbol=symbol, side=side, entry=entry, sl=sl, tp=tp, strategy=strategy)
+    open_trade(side, strategy, last_closed_trade, sig15)
 
 
 def bot_loop() -> None:
