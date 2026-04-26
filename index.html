@@ -4760,6 +4760,24 @@ function timeframeTradeExists(tf){
   return st.trades.some(t=>t.tf===key);
 }
 
+function timeframeTradeIndex(tf){
+  const st = getState();
+  if(!st || !Array.isArray(st.trades)) return -1;
+  const key = normalizeTf(tf);
+  return st.trades.findIndex(t => t?.tf === key);
+}
+
+function closedSignalCandles(candles, closedTime=0){
+  const arr = Array.isArray(candles) ? candles : [];
+  if(!arr.length) return [];
+  const ts = Number(closedTime || 0);
+  if(ts > 0){
+    const filtered = arr.filter(c => Number(c?.time || 0) <= ts);
+    if(filtered.length) return filtered;
+  }
+  return arr.length > 1 ? arr.slice(0, -1) : arr.slice();
+}
+
 function openTradeWithConfig(cfg){
   const st=getState();
   const sym=store.current;
@@ -4771,8 +4789,8 @@ function openTradeWithConfig(cfg){
   if(side!=='LONG' && side!=='SHORT') return false;
 
   if(timeframeTradeExists(tf)) return false;
-  if(tradeCooldownActive(st)) return false;
-  if(!canOpenNewTradeToday(st)) return false;
+  if(!cfg?.bypassCooldown && tradeCooldownActive(st)) return false;
+  if(!cfg?.bypassDailyLimit && !canOpenNewTradeToday(st)) return false;
 
   const lot = deltaNormalizeLots(Number(cfg?.lot || st?.defaultLot || 1));
   if(!Number.isFinite(lot) || lot <= 0) return false;
@@ -4828,7 +4846,7 @@ function openTradeWithConfig(cfg){
   return true;
 }
 
-function executeTrade(side, strategy, tf){
+function executeTrade(side, strategy, tf, opts={}){
   const st=getState();
   const sym=store.current;
   const price = st.price || st.candlesByTf[tf]?.at(-1)?.close;
@@ -4850,6 +4868,8 @@ function executeTrade(side, strategy, tf){
     sl,
     tp,
     rrLabel: rr,
+    bypassCooldown: !!opts?.bypassCooldown,
+    bypassDailyLimit: !!opts?.bypassDailyLimit,
   });
 }
 
@@ -4863,7 +4883,7 @@ function updateTradeStats(trade, price){
   return {pnlUsd, pnlINR};
 }
 
-function closeTrade(index, reason){
+function closeTrade(index, reason, opts={}){
   const st=getState();
   const tr=st.trades[index];
   const price = st.price || st.candlesByTf[tr.tf]?.at(-1)?.close || tr.entry;
@@ -4883,7 +4903,9 @@ function closeTrade(index, reason){
   // Optional: Delta live trading hook
   try{ deltaCloseOrder(tr); }catch(e){}
 
-  startTradeCooldown(reason);
+  if(!opts?.skipCooldown){
+    startTradeCooldown(reason);
+  }
 
   toast(`${reason} | ${(pnlUsd>=0?'+':'-')}$${Math.abs(pnlUsd).toFixed(2)}`, pnlUsd>=0?'success':'error');
   saveAll();
@@ -5072,23 +5094,39 @@ function updateTrades(){
 async function runBot(){
   const st=getState();
   if(!st.botEnabled) return;
-  if(tradeCooldownActive(st)) return;
-  if(!canOpenNewTradeToday(st)) return;
   const tradeTf = getBotTradeTf(st);
   if(!st.enabledTf?.[tradeTf]) return;
-  if(timeframeTradeExists(tradeTf)) return;
   const activeStrategy = getActiveEntryStrategy(st);
   if(!activeStrategy) return;
 
   if(activeStrategy === 'utBot'){
-    const candles = st.candlesByTf?.[tradeTf] || [];
+    const closedTime = Number(st.lastClosedCandleByTf?.[tradeTf] || 0);
+    const candles = closedSignalCandles(st.candlesByTf?.[tradeTf] || [], closedTime);
     const selected = utBotSignal(candles);
     syncStrategyUI();
     if(!selected?.ok || !selected.side) return;
     if(String(selected.signal || 'WAIT') === 'WAIT') return;
+    const activeIndex = timeframeTradeIndex(tradeTf);
+    if(activeIndex >= 0){
+      const activeTrade = st.trades[activeIndex];
+      if(activeTrade?.side === selected.side) return;
+      closeTrade(activeIndex, `UT Flip (${tradeTf} close): ${selected.signal}`, { skipCooldown:true });
+      executeTrade(
+        selected.side,
+        selected.strategy || selected.why || 'UT Bot Alerts',
+        tradeTf,
+        { bypassCooldown:true, bypassDailyLimit:true }
+      );
+      return;
+    }
+    if(tradeCooldownActive(st)) return;
+    if(!canOpenNewTradeToday(st)) return;
     executeTrade(selected.side, selected.strategy || selected.why || 'UT Bot Alerts', tradeTf);
     return;
   }
+
+  if(tradeCooldownActive(st)) return;
+  if(!canOpenNewTradeToday(st)) return;
 
   const regime = determineRegime(st);
   const pa = priceActionSignal(st, regime, tradeTf);
